@@ -2,9 +2,12 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
 import { AISettings } from './AISettings';
+import { themeService } from '../services/ThemeService';
+import { audioService } from '../services/AudioService';
+import { updateGameStats } from './GameStatsPanel';
 
 const BOARD_SIZE = 15;
-const CELL_SIZE = 30;
+const CELL_SIZE = 35;
 const BOARD_WIDTH = BOARD_SIZE * CELL_SIZE;
 const BOARD_HEIGHT = BOARD_SIZE * CELL_SIZE;
 
@@ -14,8 +17,33 @@ export const GameBoard: React.FC = () => {
   const boardContainerRef = useRef<PIXI.Container | null>(null);
   const stonesContainerRef = useRef<PIXI.Container | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
   
   const { board, currentPlayer, winner, gameOver, gameMode, isAIThinking, makeMove, resetGame, setGameMode } = useGameStore();
+
+  // 监听主题变化
+  useEffect(() => {
+    const handleThemeChange = (theme: any) => {
+      setCurrentTheme(theme);
+      // 重新绘制棋盘
+      if (appRef.current) {
+        appRef.current.renderer.background.color = theme.backgroundColor;
+        redrawBoard();
+      }
+    };
+
+    themeService.addListener(handleThemeChange);
+    return () => {
+      themeService.removeListener(handleThemeChange);
+    };
+  }, []);
+
+  const redrawBoard = () => {
+    if (!boardContainerRef.current) return;
+    
+    boardContainerRef.current.removeChildren();
+    drawBoard();
+  };
 
   // 初始化 PixiJS
   useEffect(() => {
@@ -28,7 +56,7 @@ export const GameBoard: React.FC = () => {
       await app.init({
         width: BOARD_WIDTH + 60,
         height: BOARD_HEIGHT + 60,
-        backgroundColor: 0xD2B48C, // 更温暖的木色背景
+        backgroundColor: currentTheme.backgroundColor,
         antialias: true,
       });
 
@@ -71,7 +99,7 @@ export const GameBoard: React.FC = () => {
     const graphics = new PIXI.Graphics();
     
     // 绘制网格线
-    graphics.lineStyle(2, 0x8B4513, 0.8); // 更粗的棕色线条
+    graphics.lineStyle(2, currentTheme.gridColor, 0.8);
     
     for (let i = 0; i < BOARD_SIZE; i++) {
       // 垂直线
@@ -83,14 +111,14 @@ export const GameBoard: React.FC = () => {
       graphics.lineTo(BOARD_WIDTH - CELL_SIZE, i * CELL_SIZE);
     }
 
-    // 绘制天元和星位（更大更明显）
+    // 绘制天元和星位
     const starPositions = [
       [3, 3], [3, 11], [11, 3], [11, 11], [7, 7]
     ];
 
     starPositions.forEach(([row, col]) => {
-      graphics.beginFill(0x654321, 0.8);
-      graphics.drawCircle(col * CELL_SIZE, row * CELL_SIZE, 5);
+      graphics.beginFill(currentTheme.starColor, 0.8);
+      graphics.drawCircle(col * CELL_SIZE, row * CELL_SIZE, 6);
       graphics.endFill();
     });
 
@@ -109,7 +137,12 @@ export const GameBoard: React.FC = () => {
     const row = Math.round((pos.y - 30) / CELL_SIZE);
 
     if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-      makeMove(row, col);
+      const success = makeMove(row, col);
+      if (success) {
+        audioService.playSound('place_stone');
+      } else {
+        audioService.playSound('error');
+      }
     }
   }, [gameOver, isAIThinking, gameMode, currentPlayer, makeMove]);
 
@@ -171,14 +204,37 @@ export const GameBoard: React.FC = () => {
     }
   }, [board]);
 
+  // 检查游戏结果并播放音效
+  useEffect(() => {
+    if (gameOver && winner) {
+      audioService.playSound('win');
+      
+      // 更新统计数据
+      if (gameMode === 'ai') {
+        // AI模式下，玩家是黑棋(1)
+        if (winner === 1) {
+          updateGameStats('win');
+        } else {
+          updateGameStats('lose');
+        }
+      } else if (gameMode === 'human') {
+        // 双人模式，不区分胜负，只记录游戏次数
+        updateGameStats('win'); // 可以根据具体需求修改
+      }
+    }
+  }, [gameOver, winner, gameMode]);
+
   return (
     <div className="flex flex-col items-center gap-6">
       {/* 游戏模式选择 */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-4 border-2 border-amber-200">
+      <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-4 border-2`}>
         <div className="flex items-center gap-4">
-          <span className="text-lg font-semibold text-amber-800">游戏模式:</span>
+          <span className="text-lg font-semibold text-gray-800">游戏模式:</span>
           <button
-            onClick={() => setGameMode('human')}
+            onClick={() => {
+              setGameMode('human');
+              audioService.playSound('click');
+            }}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${
               gameMode === 'human' 
                 ? 'bg-amber-500 text-white shadow-lg' 
@@ -188,7 +244,10 @@ export const GameBoard: React.FC = () => {
             双人对战
           </button>
           <button
-            onClick={() => setGameMode('ai')}
+            onClick={() => {
+              setGameMode('ai');
+              audioService.playSound('click');
+            }}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${
               gameMode === 'ai' 
                 ? 'bg-amber-500 text-white shadow-lg' 
@@ -199,7 +258,10 @@ export const GameBoard: React.FC = () => {
           </button>
           {gameMode === 'ai' && (
             <button
-              onClick={() => setShowAISettings(true)}
+              onClick={() => {
+                setShowAISettings(true);
+                audioService.playSound('click');
+              }}
               className="px-3 py-2 bg-amber-200 text-amber-800 rounded-lg hover:bg-amber-300 transition-colors"
               title="AI设置"
             >
@@ -210,10 +272,10 @@ export const GameBoard: React.FC = () => {
       </div>
 
       {/* 游戏状态面板 */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border-2 border-amber-200">
+      <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-6 border-2`}>
         <div className="flex items-center justify-between gap-8">
           <div className="text-center">
-            <div className="text-2xl font-bold text-amber-800 mb-2">
+            <div className="text-2xl font-bold text-gray-800 mb-2">
               {gameOver ? (
                 winner === 1 ? '🎉 黑棋获胜！' : winner === 2 ? '🎉 白棋获胜！' : '平局'
               ) : isAIThinking ? (
@@ -227,7 +289,7 @@ export const GameBoard: React.FC = () => {
                 <div className={`w-6 h-6 rounded-full border-2 ${
                   currentPlayer === 1 ? 'bg-black border-gray-600' : 'bg-white border-gray-400'
                 }`}></div>
-                <span className="text-lg font-semibold text-amber-700">
+                <span className="text-lg font-semibold text-gray-700">
                   {gameMode === 'ai' ? 
                     (currentPlayer === 1 ? '玩家' : 'AI') : 
                     (currentPlayer === 1 ? '黑棋' : '白棋')
@@ -238,7 +300,10 @@ export const GameBoard: React.FC = () => {
           </div>
           
           <button
-            onClick={resetGame}
+            onClick={() => {
+              resetGame();
+              audioService.playSound('click');
+            }}
             className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white 
                      font-semibold rounded-xl shadow-lg hover:from-amber-600 hover:to-orange-600 
                      transform hover:scale-105 transition-all duration-200 active:scale-95"
@@ -252,7 +317,7 @@ export const GameBoard: React.FC = () => {
       <div className="relative">
         <div 
           ref={canvasRef}
-          className={`border-4 border-amber-800 rounded-2xl shadow-2xl bg-amber-100 ${
+          className={`${currentTheme.boardBorderColor} border-4 rounded-2xl shadow-2xl ${
             isAIThinking ? 'opacity-75 cursor-wait' : ''
           }`}
           style={{ 
@@ -281,7 +346,7 @@ export const GameBoard: React.FC = () => {
       </div>
       
       {/* 提示信息 */}
-      <div className="text-center text-amber-700 bg-white/60 px-4 py-2 rounded-lg">
+      <div className="text-center text-gray-700 bg-white/60 px-4 py-2 rounded-lg">
         <p className="text-sm font-medium">
           {gameMode === 'ai' ? 
             '💡 您执黑棋，点击棋盘交叉点处落子' : 
@@ -289,7 +354,7 @@ export const GameBoard: React.FC = () => {
           }
         </p>
         {gameOver && (
-          <p className="text-xs mt-1 text-amber-600">点击"重新开始"按钮开始新游戏</p>
+          <p className="text-xs mt-1 text-gray-600">点击"重新开始"按钮开始新游戏</p>
         )}
       </div>
       
