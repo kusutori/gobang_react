@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameBoard } from "./components/GameBoard";
+import { SimpleGameBoard } from "./components/SimpleGameBoard";
 import { OnlineGame } from "./components/OnlineGame";
 import { OnlineGameBoard } from "./components/OnlineGameBoard";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -8,6 +9,7 @@ import { FullscreenButton } from "./components/FullscreenButton";
 import { AudioControls } from "./components/AudioControls";
 import { GameStatsPanel } from "./components/GameStatsPanel";
 import { QuickGuide } from "./components/QuickGuide";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useKeyboardShortcuts, globalShortcuts } from "./hooks/useKeyboardShortcuts";
 import { RoomData, socketService, SOCKET_EVENTS } from "./services/SocketService";
 import { themeService } from "./services/ThemeService";
@@ -342,7 +344,9 @@ export function App() {
           {/* 右侧游戏区域 - 自适应棋盘大小 */}
           <div className="flex-1 flex items-center justify-center p-4">
             <div className="w-full h-full max-w-[600px] max-h-[600px] aspect-square">
-              <GameBoard />
+              <ErrorBoundary>
+                <GameBoard />
+              </ErrorBoundary>
             </div>
           </div>
         </div>

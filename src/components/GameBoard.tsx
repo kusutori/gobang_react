@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
 import { AISettings } from './AISettings';
+import { ErrorBoundary } from './ErrorBoundary';
 import { themeService } from '../services/ThemeService';
 import { audioService } from '../services/AudioService';
 import { updateGameStats } from './GameStatsPanel';
@@ -23,8 +24,21 @@ export const GameBoard: React.FC = () => {
   const [boardHeight, setBoardHeight] = useState(0);
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [canvasHeight, setCanvasHeight] = useState(0);
+  const [pixiError, setPixiError] = useState<string | null>(null);
   
   const { board, currentPlayer, winner, gameOver, gameMode, isAIThinking, makeMove, resetGame, setGameMode } = useGameStore();
+
+  // 获取主题装饰角颜色
+  const getThemeCornerColor = useCallback((theme: any) => {
+    switch (theme.id) {
+      case 'modern': return 'bg-gray-600';
+      case 'jade': return 'bg-emerald-600';
+      case 'ocean': return 'bg-blue-600';
+      case 'sunset': return 'bg-orange-600';
+      case 'purple': return 'bg-purple-600';
+      default: return 'bg-amber-800';
+    }
+  }, []);
 
   // 计算棋盘尺寸
   const calculateBoardSize = useCallback(() => {
@@ -71,19 +85,35 @@ export const GameBoard: React.FC = () => {
   useEffect(() => {
     const handleThemeChange = (theme: any) => {
       setCurrentTheme(theme);
-      // 重新绘制棋盘
-      if (appRef.current) {
-        appRef.current.renderer.background.color = theme.backgroundColor;
-        redrawBoard();
+    };
+
+    // 监听页面可见性变化，防止后台标签页白屏
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // 页面隐藏时暂停渲染
+        if (appRef.current) {
+          appRef.current.ticker.stop();
+        }
+      } else {
+        // 页面显示时恢复渲染
+        if (appRef.current) {
+          appRef.current.ticker.start();
+          // 强制重新渲染一次
+          appRef.current.render();
+        }
       }
     };
 
     themeService.addListener(handleThemeChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       themeService.removeListener(handleThemeChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
+  // 重绘棋盘的函数
   const redrawBoard = useCallback(() => {
     if (!boardContainerRef.current) return;
     
@@ -122,14 +152,15 @@ export const GameBoard: React.FC = () => {
     boardContainerRef.current.addChild(graphics);
   }, [cellSize, boardHeight, boardWidth, currentTheme.gridColor, currentTheme.starColor]);
 
-  // 初始化 PixiJS
-  useEffect(() => {
+  // 初始化PixiJS应用
+  const initializePixiApp = useCallback(async () => {
     if (!canvasRef.current || canvasWidth === 0 || canvasHeight === 0) return;
 
-    const app = new PIXI.Application();
-    
-    // 异步初始化应用
-    const initApp = async () => {
+    try {
+      setPixiError(null); // 清除之前的错误
+      
+      const app = new PIXI.Application();
+      
       await app.init({
         width: canvasWidth,
         height: canvasHeight,
@@ -137,12 +168,48 @@ export const GameBoard: React.FC = () => {
         antialias: true,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
+        powerPreference: 'high-performance',
+        preserveDrawingBuffer: true,
       });
 
       appRef.current = app;
-      canvasRef.current!.appendChild(app.canvas);
+      
+      // 处理WebGL上下文丢失
+      const canvas = app.canvas;
+      const handleContextLost = (event: Event) => {
+        event.preventDefault();
+        console.warn('WebGL context lost, attempting to restore...');
+        setPixiError('WebGL上下文丢失，正在尝试恢复...');
+      };
+      
+      const handleContextRestored = () => {
+        console.log('WebGL context restored');
+        setPixiError(null);
+        // 重建应用
+        setTimeout(() => {
+          destroyPixiApp();
+          requestAnimationFrame(() => {
+            if (canvasWidth > 0 && canvasHeight > 0) {
+              initializePixiApp();
+            }
+          });
+        }, 100);
+      };
+      
+      canvas.addEventListener('webglcontextlost', handleContextLost);
+      canvas.addEventListener('webglcontextrestored', handleContextRestored);
+      
+      // 在应用销毁时清理事件监听
+      const originalDestroy = app.destroy;
+      app.destroy = function(...args) {
+        canvas.removeEventListener('webglcontextlost', handleContextLost);
+        canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+        return originalDestroy.apply(this, args);
+      };
 
-      // 设置canvas样式确保不会溢出
+      canvasRef.current.appendChild(app.canvas);
+
+      // 设置canvas样式
       app.canvas.style.width = `${canvasWidth}px`;
       app.canvas.style.height = `${canvasHeight}px`;
       app.canvas.style.display = 'block';
@@ -161,22 +228,156 @@ export const GameBoard: React.FC = () => {
       stonesContainerRef.current = stonesContainer;
       app.stage.addChild(stonesContainer);
 
-      // 绘制棋盘
-      drawBoard();
-
       // 添加点击事件
       app.stage.interactive = true;
-      app.stage.on('pointerdown', onBoardClick);
-    };
+      app.stage.on('pointerdown', (event: any) => {
+        if (gameOver || isAIThinking) return;
+        
+        if (gameMode === 'ai' && currentPlayer !== 1) return;
 
-    initApp();
+        const pos = event.data.getLocalPosition(app.stage);
+        const boardX = pos.x - BOARD_PADDING;
+        const boardY = pos.y - BOARD_PADDING;
+        
+        if (boardX < 0 || boardX > boardWidth || boardY < 0 || boardY > boardHeight) {
+          return;
+        }
+        
+        const col = Math.round(boardX / cellSize);
+        const row = Math.round(boardY / cellSize);
+
+        if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+          const success = makeMove(row, col);
+          if (success) {
+            audioService.playSound('place_stone');
+          } else {
+            audioService.playSound('error');
+          }
+        }
+      });
+
+      // 绘制棋盘
+      redrawBoard();
+      
+      // 重新绘制棋子
+      if (stonesContainerRef.current) {
+        stonesContainerRef.current.removeChildren();
+        for (let row = 0; row < BOARD_SIZE; row++) {
+          for (let col = 0; col < BOARD_SIZE; col++) {
+            const cell = board[row][col];
+            if (cell !== 0) {
+              // 内联绘制棋子
+              const graphics = new PIXI.Graphics();
+              const radius = cellSize / 2 - 2;
+              
+              if (cell === 1) {
+                // 黑棋
+                graphics.beginFill(0x1a1a1a);
+                graphics.drawCircle(col * cellSize, row * cellSize, radius);
+                graphics.endFill();
+                graphics.beginFill(0x404040, 0.6);
+                graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
+                graphics.endFill();
+                graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
+                graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              } else {
+                // 白棋
+                graphics.beginFill(0xffffff);
+                graphics.drawCircle(col * cellSize, row * cellSize, radius);
+                graphics.endFill();
+                graphics.beginFill(0xe0e0e0, 0.4);
+                graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
+                graphics.endFill();
+                graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
+                graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              }
+              
+              stonesContainerRef.current.addChild(graphics);
+            }
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to initialize PixiJS:', error);
+      setPixiError(error instanceof Error ? error.message : '初始化PixiJS失败');
+    }
+  }, [canvasWidth, canvasHeight, currentTheme, gameOver, isAIThinking, gameMode, currentPlayer, makeMove, boardWidth, boardHeight, cellSize, board, redrawBoard]);
+
+  // 销毁PixiJS应用的函数
+  const destroyPixiApp = useCallback(() => {
+    if (appRef.current) {
+      try {
+        appRef.current.destroy(true, { children: true, texture: true });
+      } catch (error) {
+        console.warn('Error destroying PixiJS app:', error);
+      }
+      appRef.current = null;
+    }
+    
+    boardContainerRef.current = null;
+    stonesContainerRef.current = null;
+    
+    if (canvasRef.current) {
+      canvasRef.current.innerHTML = '';
+    }
+  }, []);
+
+  // 重建PixiJS应用的函数
+  const rebuildPixiApp = useCallback(() => {
+    destroyPixiApp();
+    
+    // 使用 requestAnimationFrame 确保DOM更新完成
+    requestAnimationFrame(() => {
+      if (canvasWidth > 0 && canvasHeight > 0) {
+        initializePixiApp();
+      }
+    });
+  }, [destroyPixiApp, canvasWidth, canvasHeight, initializePixiApp]);
+
+  // 统一的PixiJS应用生命周期管理
+  useEffect(() => {
+    // 初始化条件：尺寸有效且应用不存在
+    if (canvasWidth > 0 && canvasHeight > 0 && !appRef.current) {
+      initializePixiApp();
+    }
 
     return () => {
-      if (appRef.current) {
-        appRef.current.destroy();
-      }
+      destroyPixiApp();
     };
-  }, [canvasWidth, canvasHeight, currentTheme.backgroundColor]);
+  }, [canvasWidth, canvasHeight, initializePixiApp, destroyPixiApp]);
+
+  // 处理尺寸变化
+  useEffect(() => {
+    if (appRef.current && canvasWidth > 0 && canvasHeight > 0) {
+      // 调整应用尺寸
+      appRef.current.renderer.resize(canvasWidth, canvasHeight);
+      
+      // 更新canvas样式
+      appRef.current.canvas.style.width = `${canvasWidth}px`;
+      appRef.current.canvas.style.height = `${canvasHeight}px`;
+      
+      // 重绘棋盘
+      redrawBoard();
+    }
+  }, [canvasWidth, canvasHeight, cellSize, boardWidth, boardHeight, redrawBoard]);
+
+  // 更新背景色的函数
+  const updateBackgroundColor = useCallback(() => {
+    if (appRef.current) {
+      // 使用类型断言来避免TypeScript错误
+      (appRef.current.renderer as any).backgroundColor = currentTheme.backgroundColor;
+    }
+  }, [currentTheme.backgroundColor]);
+
+  // 当主题变化时更新背景色而不重建应用
+  useEffect(() => {
+    if (appRef.current) {
+      updateBackgroundColor();
+      // 重绘棋盘以更新颜色
+      redrawBoard();
+    }
+  }, [currentTheme.id, updateBackgroundColor, redrawBoard]);
 
   // 绘制棋盘网格
   const drawBoard = useCallback(() => {
@@ -214,79 +415,6 @@ export const GameBoard: React.FC = () => {
     boardContainerRef.current.addChild(graphics);
   }, [cellSize, boardHeight, boardWidth, currentTheme.gridColor, currentTheme.starColor]);
 
-  // 处理棋盘点击
-  const onBoardClick = useCallback((event: any) => {
-    if (gameOver || isAIThinking) return;
-    
-    // 在 AI 模式下，只允许玩家（黑棋）下棋
-    if (gameMode === 'ai' && currentPlayer !== 1) return;
-
-    const pos = event.data.getLocalPosition(appRef.current!.stage);
-    
-    // 计算点击的网格位置
-    const boardX = pos.x - BOARD_PADDING;
-    const boardY = pos.y - BOARD_PADDING;
-    
-    // 确保点击在棋盘范围内
-    if (boardX < 0 || boardX > boardWidth || boardY < 0 || boardY > boardHeight) {
-      return;
-    }
-    
-    // 计算最近的网格交叉点
-    const col = Math.round(boardX / cellSize);
-    const row = Math.round(boardY / cellSize);
-
-    // 确保坐标在有效范围内
-    if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-      const success = makeMove(row, col);
-      if (success) {
-        audioService.playSound('place_stone');
-      } else {
-        audioService.playSound('error');
-      }
-    }
-  }, [gameOver, isAIThinking, gameMode, currentPlayer, makeMove, boardWidth, boardHeight, cellSize]);
-
-  // 绘制棋子
-  const drawStone = useCallback((row: number, col: number, player: 1 | 2) => {
-    if (!stonesContainerRef.current) return;
-
-    const graphics = new PIXI.Graphics();
-    const radius = cellSize / 2 - 2;
-    
-    if (player === 1) {
-      // 黑棋 - 渐变效果
-      graphics.beginFill(0x1a1a1a);
-      graphics.drawCircle(col * cellSize, row * cellSize, radius);
-      graphics.endFill();
-      
-      // 高光效果
-      graphics.beginFill(0x404040, 0.6);
-      graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
-      graphics.endFill();
-      
-      // 外边框
-      graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
-      graphics.drawCircle(col * cellSize, row * cellSize, radius);
-    } else {
-      // 白棋 - 渐变效果
-      graphics.beginFill(0xffffff);
-      graphics.drawCircle(col * cellSize, row * cellSize, radius);
-      graphics.endFill();
-      
-      // 阴影效果
-      graphics.beginFill(0xe0e0e0, 0.4);
-      graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
-      graphics.endFill();
-      
-      // 外边框
-      graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
-      graphics.drawCircle(col * cellSize, row * cellSize, radius);
-    }
-
-    stonesContainerRef.current.addChild(graphics);
-  }, [stonesContainerRef, cellSize]);
-
   // 更新棋子显示
   useEffect(() => {
     if (!stonesContainerRef.current) return;
@@ -299,11 +427,37 @@ export const GameBoard: React.FC = () => {
       for (let col = 0; col < BOARD_SIZE; col++) {
         const cell = board[row][col];
         if (cell !== 0) {
-          drawStone(row, col, cell);
+          // 内联绘制棋子
+          const graphics = new PIXI.Graphics();
+          const radius = cellSize / 2 - 2;
+          
+          if (cell === 1) {
+            // 黑棋
+            graphics.beginFill(0x1a1a1a);
+            graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            graphics.endFill();
+            graphics.beginFill(0x404040, 0.6);
+            graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
+            graphics.endFill();
+            graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
+            graphics.drawCircle(col * cellSize, row * cellSize, radius);
+          } else {
+            // 白棋
+            graphics.beginFill(0xffffff);
+            graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            graphics.endFill();
+            graphics.beginFill(0xe0e0e0, 0.4);
+            graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
+            graphics.endFill();
+            graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
+            graphics.drawCircle(col * cellSize, row * cellSize, radius);
+          }
+          
+          stonesContainerRef.current.addChild(graphics);
         }
       }
     }
-  }, [board]);
+  }, [board, cellSize]);
 
   // 检查游戏结果并播放音效
   useEffect(() => {
@@ -325,20 +479,36 @@ export const GameBoard: React.FC = () => {
     }
   }, [gameOver, winner, gameMode]);
 
-  // 当棋盘尺寸变化时重绘棋盘
-  useEffect(() => {
-    if (appRef.current && boardContainerRef.current) {
-      // 更新画布尺寸
-      appRef.current.renderer.resize(canvasWidth, canvasHeight);
-      
-      // 重新绘制棋盘
-      redrawBoard();
-    }
-  }, [canvasWidth, canvasHeight, cellSize, boardWidth, boardHeight]);
+
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-      {/* 游戏模式选择 */}
+    <ErrorBoundary fallback={
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-red-50 border border-red-200 rounded-lg p-8">
+        <div className="text-red-600 text-6xl mb-4">⚠️</div>
+        <h2 className="text-xl font-bold text-red-800 mb-2">棋盘渲染错误</h2>
+        <p className="text-red-600 text-center mb-4">
+          棋盘组件遇到了问题，请刷新页面重试
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          刷新页面
+        </button>
+      </div>
+    }>
+      <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+        {/* 显示PixiJS错误信息 */}
+        {pixiError && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg max-w-md">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-600">⚠️</span>
+              <span className="text-sm">{pixiError}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* 游戏模式选择 */}
       <div className={`${currentTheme.uiBackgroundClass} rounded-xl shadow-lg p-3 border-2 text-sm`}>
         <div className="flex items-center gap-3">
           <span className="font-semibold text-gray-800">模式:</span>
@@ -441,38 +611,17 @@ export const GameBoard: React.FC = () => {
         />
         
         {/* 棋盘装饰角 - 使用主题色 */}
-        <div className={`absolute -top-1 -left-1 w-3 h-3 rounded-full ${
-          currentTheme.id === 'modern' ? 'bg-gray-600' : 
-          currentTheme.id === 'jade' ? 'bg-emerald-600' :
-          currentTheme.id === 'ocean' ? 'bg-blue-600' :
-          currentTheme.id === 'sunset' ? 'bg-orange-600' :
-          currentTheme.id === 'purple' ? 'bg-purple-600' :
-          'bg-amber-800'
-        }`}></div>
-        <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-          currentTheme.id === 'modern' ? 'bg-gray-600' : 
-          currentTheme.id === 'jade' ? 'bg-emerald-600' :
-          currentTheme.id === 'ocean' ? 'bg-blue-600' :
-          currentTheme.id === 'sunset' ? 'bg-orange-600' :
-          currentTheme.id === 'purple' ? 'bg-purple-600' :
-          'bg-amber-800'
-        }`}></div>
-        <div className={`absolute -bottom-1 -left-1 w-3 h-3 rounded-full ${
-          currentTheme.id === 'modern' ? 'bg-gray-600' : 
-          currentTheme.id === 'jade' ? 'bg-emerald-600' :
-          currentTheme.id === 'ocean' ? 'bg-blue-600' :
-          currentTheme.id === 'sunset' ? 'bg-orange-600' :
-          currentTheme.id === 'purple' ? 'bg-purple-600' :
-          'bg-amber-800'
-        }`}></div>
-        <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${
-          currentTheme.id === 'modern' ? 'bg-gray-600' : 
-          currentTheme.id === 'jade' ? 'bg-emerald-600' :
-          currentTheme.id === 'ocean' ? 'bg-blue-600' :
-          currentTheme.id === 'sunset' ? 'bg-orange-600' :
-          currentTheme.id === 'purple' ? 'bg-purple-600' :
-          'bg-amber-800'
-        }`}></div>
+        {[
+          { position: 'absolute -top-1 -left-1' },
+          { position: 'absolute -top-1 -right-1' },
+          { position: 'absolute -bottom-1 -left-1' },
+          { position: 'absolute -bottom-1 -right-1' }
+        ].map((corner, index) => (
+          <div 
+            key={index}
+            className={`${corner.position} w-3 h-3 rounded-full ${getThemeCornerColor(currentTheme)}`}
+          />
+        ))}
         
         {/* AI 思考动画 */}
         {isAIThinking && (
@@ -505,5 +654,6 @@ export const GameBoard: React.FC = () => {
         <AISettings onClose={() => setShowAISettings(false)} />
       )}
     </div>
+    </ErrorBoundary>
   );
 };
