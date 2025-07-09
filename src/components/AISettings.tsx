@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { themeService } from '../services/ThemeService';
 
 interface AISettingsProps {
   onClose: () => void;
@@ -7,6 +8,8 @@ interface AISettingsProps {
 
 export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
   const { aiPlayer, gameMode } = useGameStore();
+  const [currentTheme] = useState(themeService.getCurrentTheme());
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   
   if (gameMode !== 'ai' || !aiPlayer) return null;
   
@@ -19,8 +22,17 @@ export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
       hard: { difficulty: 3, thinkingTime: 1200 }
     };
     
+    // 更新本地状态，立即反映在UI上
+    setSelectedDifficulty(difficulty);
+    
+    // 更新AI配置
     aiPlayer.updateConfig(configs[difficulty]);
   };
+  
+  // 初始化选择的难度
+  React.useEffect(() => {
+    setSelectedDifficulty(getCurrentDifficulty());
+  }, []);
   
   const getCurrentDifficulty = () => {
     const diff = currentConfig.difficulty;
@@ -31,9 +43,9 @@ export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4">
+      <div className={`${currentTheme.uiBackgroundClass} rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4`}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-amber-800">AI 设置</h2>
+          <h2 className={`text-2xl font-bold ${currentTheme.headingColorClass}`}>AI 设置</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-xl"
@@ -44,7 +56,7 @@ export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
         
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">难度选择</h3>
+            <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>难度选择</h3>
             <div className="space-y-2">
               {[
                 { key: 'easy', label: '简单', desc: '思考快速，适合新手' },
@@ -55,14 +67,14 @@ export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
                   key={key}
                   onClick={() => handleDifficultyChange(key as 'easy' | 'medium' | 'hard')}
                   className={`w-full p-3 rounded-lg border-2 transition-all ${
-                    getCurrentDifficulty() === key
+                    selectedDifficulty === key
                       ? 'border-amber-500 bg-amber-50 text-amber-800'
-                      : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50'
+                      : `border-gray-200 hover:border-amber-300 hover:bg-amber-50 ${currentTheme.textColorClass}`
                   }`}
                 >
                   <div className="text-left">
                     <div className="font-medium">{label}</div>
-                    <div className="text-sm text-gray-600">{desc}</div>
+                    <div className={`text-sm ${currentTheme.subTextColorClass}`}>{desc}</div>
                   </div>
                 </button>
               ))}
@@ -72,7 +84,9 @@ export const AISettings: React.FC<AISettingsProps> = ({ onClose }) => {
           <div className="text-center">
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+              className={`px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white 
+                       font-semibold rounded-lg shadow-lg hover:from-amber-600 hover:to-orange-600 
+                       transform hover:scale-105 transition-all duration-200 active:scale-95`}
             >
               确定
             </button>
