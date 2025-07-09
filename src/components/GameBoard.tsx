@@ -266,32 +266,10 @@ export const GameBoard: React.FC = () => {
           for (let col = 0; col < BOARD_SIZE; col++) {
             const cell = board[row][col];
             if (cell !== 0) {
-              // 内联绘制棋子
-              const graphics = new PIXI.Graphics();
-              const radius = cellSize / 2 - 2;
-              
-              if (cell === 1) {
-                // 黑棋
-                graphics.beginFill(0x1a1a1a);
-                graphics.drawCircle(col * cellSize, row * cellSize, radius);
-                graphics.endFill();
-                graphics.beginFill(0x404040, 0.6);
-                graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
-                graphics.endFill();
-                graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
-                graphics.drawCircle(col * cellSize, row * cellSize, radius);
-              } else {
-                // 白棋
-                graphics.beginFill(0xffffff);
-                graphics.drawCircle(col * cellSize, row * cellSize, radius);
-                graphics.endFill();
-                graphics.beginFill(0xe0e0e0, 0.4);
-                graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
-                graphics.endFill();
-                graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
-                graphics.drawCircle(col * cellSize, row * cellSize, radius);
-              }
-              
+              const graphics = drawStone(col, row, cell);
+              // 添加位置标记方便后续查找
+              (graphics as any).row = row;
+              (graphics as any).col = col;
               stonesContainerRef.current.addChild(graphics);
             }
           }
@@ -415,49 +393,130 @@ export const GameBoard: React.FC = () => {
     boardContainerRef.current.addChild(graphics);
   }, [cellSize, boardHeight, boardWidth, currentTheme.gridColor, currentTheme.starColor]);
 
-  // 更新棋子显示
+  // 更新棋子显示 - 使用缓存优化性能
+  const lastBoardRef = useRef<number[][]>([]);
+  
   useEffect(() => {
     if (!stonesContainerRef.current) return;
-
-    // 清除所有棋子
-    stonesContainerRef.current.removeChildren();
-
-    // 重新绘制所有棋子
+    
+    // 第一次渲染时绘制所有棋子
+    if (lastBoardRef.current.length === 0) {
+      for (let row = 0; row < BOARD_SIZE; row++) {
+        lastBoardRef.current[row] = [];
+        for (let col = 0; col < BOARD_SIZE; col++) {
+          lastBoardRef.current[row][col] = 0;
+        }
+      }
+      
+      // 清除所有棋子
+      stonesContainerRef.current.removeChildren();
+      
+      // 绘制所有棋子
+      for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let col = 0; col < BOARD_SIZE; col++) {
+          const cell = board[row][col];
+          if (cell !== 0) {
+            const graphics = drawStone(col, row, cell);
+            // 添加位置标记方便后续查找
+            (graphics as any).row = row;
+            (graphics as any).col = col;
+            stonesContainerRef.current.addChild(graphics);
+            lastBoardRef.current[row][col] = cell;
+          }
+        }
+      }
+      return;
+    }      // 后续渲染只更新变化的部分
     for (let row = 0; row < BOARD_SIZE; row++) {
       for (let col = 0; col < BOARD_SIZE; col++) {
-        const cell = board[row][col];
-        if (cell !== 0) {
-          // 内联绘制棋子
-          const graphics = new PIXI.Graphics();
-          const radius = cellSize / 2 - 2;
+        const newValue = board[row][col];
+        const oldValue = lastBoardRef.current[row][col];
+        
+        // 如果棋子状态有变化
+        if (newValue !== oldValue) {
+          // 记录新状态
+          lastBoardRef.current[row][col] = newValue;
           
-          if (cell === 1) {
-            // 黑棋
-            graphics.beginFill(0x1a1a1a);
-            graphics.drawCircle(col * cellSize, row * cellSize, radius);
-            graphics.endFill();
-            graphics.beginFill(0x404040, 0.6);
-            graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
-            graphics.endFill();
-            graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
-            graphics.drawCircle(col * cellSize, row * cellSize, radius);
-          } else {
-            // 白棋
-            graphics.beginFill(0xffffff);
-            graphics.drawCircle(col * cellSize, row * cellSize, radius);
-            graphics.endFill();
-            graphics.beginFill(0xe0e0e0, 0.4);
-            graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
-            graphics.endFill();
-            graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
-            graphics.drawCircle(col * cellSize, row * cellSize, radius);
+          // 找到此位置可能已有的棋子并移除
+          const existingStones = stonesContainerRef.current.children.filter((child: any) => {
+            return child.row === row && child.col === col;
+          });
+          
+          existingStones.forEach(stone => {
+            stonesContainerRef.current?.removeChild(stone);
+          });
+          
+          // 如果新状态不为空，则添加新棋子
+          if (newValue !== 0) {
+            const graphics = drawStone(col, row, newValue);
+            
+            // 添加位置标记方便后续查找
+            (graphics as any).row = row;
+            (graphics as any).col = col;
+            
+            // 添加落子动画效果
+            graphics.scale.set(0.6);
+            graphics.alpha = 0.7;
+            
+            stonesContainerRef.current.addChild(graphics);
+            
+            // 使用PIXI.Ticker创建动画效果
+            let animationProgress = 0;
+            const animatePlacement = () => {
+              animationProgress += 0.15;
+              if (animationProgress >= 1) {
+                graphics.scale.set(1);
+                graphics.alpha = 1;
+                if (appRef.current) {
+                  appRef.current.ticker.remove(animatePlacement);
+                }
+                return;
+              }
+              
+              const easeOut = 1 - Math.pow(1 - animationProgress, 3); // 缓动函数
+              graphics.scale.set(0.6 + 0.4 * easeOut);
+              graphics.alpha = 0.7 + 0.3 * easeOut;
+            };
+            
+            if (appRef.current) {
+              appRef.current.ticker.add(animatePlacement);
+            }
           }
-          
-          stonesContainerRef.current.addChild(graphics);
         }
       }
     }
   }, [board, cellSize]);
+  
+  // 绘制棋子的函数 - 在useEffect之前定义以解决循环依赖
+  const drawStone = (col: number, row: number, type: number, cellSizeParam?: number) => {
+    const size = cellSizeParam || cellSize;
+    const graphics = new PIXI.Graphics();
+    const radius = size / 2 - 2;
+    
+    if (type === 1) {
+      // 黑棋
+      graphics.beginFill(0x1a1a1a);
+      graphics.drawCircle(col * size, row * size, radius);
+      graphics.endFill();
+      graphics.beginFill(0x404040, 0.6);
+      graphics.drawCircle(col * size - radius/3, row * size - radius/3, radius/4);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, size / 32), 0x000000, 0.8);
+      graphics.drawCircle(col * size, row * size, radius);
+    } else {
+      // 白棋
+      graphics.beginFill(0xffffff);
+      graphics.drawCircle(col * size, row * size, radius);
+      graphics.endFill();
+      graphics.beginFill(0xe0e0e0, 0.4);
+      graphics.drawCircle(col * size + radius/4, row * size + radius/4, radius/3);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, size / 32), 0x666666, 0.8);
+      graphics.drawCircle(col * size, row * size, radius);
+    }
+    
+    return graphics;
+  };
 
   // 检查游戏结果并播放音效
   useEffect(() => {
