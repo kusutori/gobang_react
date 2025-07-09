@@ -101,14 +101,14 @@ function getPatternScore(
       return blocked
         ? 0
         : halfBlocked
-        ? PATTERNS.RUSH_FOUR
-        : PATTERNS.LIVE_FOUR;
+          ? PATTERNS.RUSH_FOUR
+          : PATTERNS.LIVE_FOUR;
     case 3:
       return blocked
         ? 0
         : halfBlocked
-        ? PATTERNS.RUSH_THREE
-        : PATTERNS.LIVE_THREE;
+          ? PATTERNS.RUSH_THREE
+          : PATTERNS.LIVE_THREE;
     case 2:
       return blocked ? 0 : halfBlocked ? PATTERNS.RUSH_TWO : PATTERNS.LIVE_TWO;
     case 1:
@@ -160,9 +160,19 @@ export function evaluateBoard(board: Board, player: CellState): number {
     for (let col = 0; col < 15; col++) {
       if (board[row][col] === 0) {
         // 我方得分
-        score += evaluatePosition(board, row, col, player);
-        // 对手得分（负分）
-        score -= evaluatePosition(board, row, col, opponent) * 0.9;
+        const myScore = evaluatePosition(board, row, col, player);
+        score += myScore;
+
+        // 对手得分（负分），提高防御系数使AI更重视防守
+        const opponentScore = evaluatePosition(board, row, col, opponent);
+
+        // 根据对手棋型的威胁程度增加防御系数
+        // 如果对手在此位置能形成活三或更高的威胁，大幅提高防御权重
+        if (opponentScore >= PATTERNS.LIVE_THREE) {
+          score -= opponentScore * 1.5; // 提高活三或更高威胁的防御系数
+        } else {
+          score -= opponentScore * 1.2; // 普通威胁的防御系数
+        }
       }
     }
   }

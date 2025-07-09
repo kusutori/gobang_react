@@ -80,17 +80,17 @@ export function createAIConfig(
 ): AIConfig {
   const configs = {
     easy: {
-      difficulty: 1,
+      difficulty: 1,  // 搜索深度低，较少考虑防御
       thinkingTime: 300,
       player,
     },
     medium: {
-      difficulty: 2,
+      difficulty: 2,  // 中等搜索深度和防御能力
       thinkingTime: 800,
       player,
     },
     hard: {
-      difficulty: 3,
+      difficulty: 3,  // 更高搜索深度，更强防御能力
       thinkingTime: 1200,
       player,
     },
