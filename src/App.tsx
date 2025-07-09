@@ -213,10 +213,10 @@ export function App() {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-amber-800 mb-2 drop-shadow-lg">
+            <h1 className={`text-5xl font-bold ${currentTheme.headingColorClass} mb-2 drop-shadow-lg`}>
               五子棋
             </h1>
-            <p className="text-amber-700 text-lg font-medium">
+            <p className={`${currentTheme.accentColorClass} text-lg font-medium`}>
               连续五子获胜 · 选择游戏模式
             </p>
           </div>
@@ -277,8 +277,8 @@ export function App() {
             {/* 顶部标题和控制 */}
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h1 className="text-3xl font-bold text-amber-800">五子棋</h1>
-                <p className="text-amber-700 text-sm">本地游戏</p>
+                <h1 className={`text-3xl font-bold ${currentTheme.headingColorClass}`}>五子棋</h1>
+                <p className={`${currentTheme.accentColorClass} text-sm`}>本地游戏</p>
               </div>
               <div className="flex items-center gap-2">
                 <AudioControls />
@@ -307,21 +307,21 @@ export function App() {
               <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 border-2`}>
                 <div className="text-center mb-4">
                   <div className="text-2xl mb-2">🎮</div>
-                  <div className="text-lg font-semibold text-gray-800">游戏信息</div>
+                  <div className={`text-lg font-semibold ${currentTheme.headingColorClass}`}>游戏信息</div>
                 </div>
                 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">游戏模式</span>
-                    <span className="font-medium text-gray-800">本地对战</span>
+                    <span className={`${currentTheme.subTextColorClass}`}>游戏模式</span>
+                    <span className={`font-medium ${currentTheme.textColorClass}`}>本地对战</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">棋盘大小</span>
-                    <span className="font-medium text-gray-800">15×15</span>
+                    <span className={`${currentTheme.subTextColorClass}`}>棋盘大小</span>
+                    <span className={`font-medium ${currentTheme.textColorClass}`}>15×15</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">获胜条件</span>
-                    <span className="font-medium text-gray-800">五子连珠</span>
+                    <span className={`${currentTheme.subTextColorClass}`}>获胜条件</span>
+                    <span className={`font-medium ${currentTheme.textColorClass}`}>五子连珠</span>
                   </div>
                 </div>
               </div>
@@ -367,10 +367,10 @@ export function App() {
       <div className={`min-h-screen ${currentTheme.boardBackgroundClass}`}>
         <div className="container mx-auto px-4 py-8">            <div className="flex justify-between items-center mb-8">
               <div className="text-center">
-                <h1 className="text-5xl font-bold text-amber-800 mb-2 drop-shadow-lg">
+                <h1 className={`text-5xl font-bold ${currentTheme.headingColorClass} mb-2 drop-shadow-lg`}>
                   五子棋
                 </h1>
-                <p className="text-amber-700 text-lg font-medium">
+                <p className={`${currentTheme.accentColorClass} text-lg font-medium`}>
                   连续五子获胜 · 联机对战
                 </p>
               </div>
@@ -438,19 +438,19 @@ export function App() {
 
             {/* 房间信息 */}
             <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 mb-6 border-2`}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">🏠 房间信息</h3>
+              <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>🏠 房间信息</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">房间号</span>
-                  <span className="font-medium text-gray-800">{currentRoom.id}</span>
+                  <span className={`${currentTheme.subTextColorClass}`}>房间号</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>{currentRoom.id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">玩家数</span>
-                  <span className="font-medium text-gray-800">{Object.keys(currentRoom.players).length}/2</span>
+                  <span className={`${currentTheme.subTextColorClass}`}>玩家数</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>{Object.keys(currentRoom.players).length}/2</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">游戏状态</span>
-                  <span className="font-medium text-gray-800">
+                  <span className={`${currentTheme.subTextColorClass}`}>游戏状态</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>
                     {currentRoom.gameOver ? '已结束' : 
                      currentRoom.gameStarted ? '游戏中' : '等待中'}
                   </span>
@@ -460,15 +460,15 @@ export function App() {
 
             {/* 玩家列表 */}
             <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 mb-6 border-2`}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">👥 玩家列表</h3>
+              <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>👥 玩家列表</h3>
               <div className="space-y-2">
                 {Object.values(currentRoom.players).map((player, index) => (
                   <div key={player.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-4 h-4 rounded-full ${index === 0 ? 'bg-black' : 'bg-white border'}`}></div>
-                      <span className="text-gray-800">{player.name}</span>
+                      <span className={`${currentTheme.textColorClass}`}>{player.name}</span>
                     </div>
-                    <span className={`text-sm ${player.ready ? 'text-green-600' : 'text-gray-400'}`}>
+                    <span className={`text-sm ${player.ready ? 'text-green-600' : currentTheme.subTextColorClass}`}>
                       {player.ready ? '准备' : '未准备'}
                     </span>
                   </div>

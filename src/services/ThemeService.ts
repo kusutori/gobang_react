@@ -9,6 +9,11 @@ export interface BoardTheme {
     uiBackgroundClass: string;
     description: string;
     icon: string;
+    isDark: boolean;
+    textColorClass: string;
+    headingColorClass: string;
+    subTextColorClass: string;
+    accentColorClass: string;
 }
 
 export const boardThemes: BoardTheme[] = [
@@ -22,7 +27,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-amber-100 via-orange-50 to-yellow-100',
         uiBackgroundClass: 'bg-white/80 backdrop-blur-sm border-amber-200',
         description: '传统的木质棋盘风格',
-        icon: '🪵'
+        icon: '🪵',
+        isDark: false,
+        textColorClass: 'text-gray-800',
+        headingColorClass: 'text-amber-800',
+        subTextColorClass: 'text-gray-600',
+        accentColorClass: 'text-amber-700'
     },
     {
         id: 'modern',
@@ -34,7 +44,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900',
         uiBackgroundClass: 'bg-gray-800/90 backdrop-blur-sm border-gray-600',
         description: '现代简约深色主题',
-        icon: '🌙'
+        icon: '🌙',
+        isDark: true,
+        textColorClass: 'text-gray-200',
+        headingColorClass: 'text-white',
+        subTextColorClass: 'text-gray-400',
+        accentColorClass: 'text-sky-400'
     },
     {
         id: 'jade',
@@ -46,7 +61,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50',
         uiBackgroundClass: 'bg-emerald-100/80 backdrop-blur-sm border-emerald-300',
         description: '清新的翡翠绿主题',
-        icon: '🍃'
+        icon: '🍃',
+        isDark: false,
+        textColorClass: 'text-gray-800',
+        headingColorClass: 'text-emerald-800',
+        subTextColorClass: 'text-gray-600',
+        accentColorClass: 'text-emerald-700'
     },
     {
         id: 'ocean',
@@ -58,7 +78,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-blue-50 via-sky-50 to-cyan-50',
         uiBackgroundClass: 'bg-blue-100/80 backdrop-blur-sm border-blue-300',
         description: '深邃的海洋蓝主题',
-        icon: '🌊'
+        icon: '🌊',
+        isDark: false,
+        textColorClass: 'text-gray-800',
+        headingColorClass: 'text-blue-800',
+        subTextColorClass: 'text-gray-600',
+        accentColorClass: 'text-blue-700'
     },
     {
         id: 'sunset',
@@ -70,7 +95,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-orange-50 via-red-50 to-pink-50',
         uiBackgroundClass: 'bg-orange-100/80 backdrop-blur-sm border-orange-300',
         description: '温暖的日落橙主题',
-        icon: '🌅'
+        icon: '🌅',
+        isDark: false,
+        textColorClass: 'text-gray-800',
+        headingColorClass: 'text-orange-800',
+        subTextColorClass: 'text-gray-600',
+        accentColorClass: 'text-orange-700'
     },
     {
         id: 'purple',
@@ -82,7 +112,12 @@ export const boardThemes: BoardTheme[] = [
         boardBackgroundClass: 'bg-gradient-to-br from-purple-50 via-violet-50 to-indigo-50',
         uiBackgroundClass: 'bg-purple-100/80 backdrop-blur-sm border-purple-300',
         description: '优雅的紫罗兰主题',
-        icon: '🔮'
+        icon: '🔮',
+        isDark: false,
+        textColorClass: 'text-gray-800',
+        headingColorClass: 'text-purple-800',
+        subTextColorClass: 'text-gray-600',
+        accentColorClass: 'text-purple-700'
     }
 ];
 

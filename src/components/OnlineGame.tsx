@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { socketService, SOCKET_EVENTS, RoomData } from '../services/SocketService';
+import { themeService } from '../services/ThemeService';
 
 interface OnlineGameProps {
   onBack: () => void;
@@ -15,6 +16,7 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
   const [roomList, setRoomList] = useState<Array<{id: string, playerCount: number, gameStarted: boolean}>>([]);
   const [error, setError] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
 
   useEffect(() => {
     // 设置Socket事件监听器
@@ -75,6 +77,19 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
       socketService.off(SOCKET_EVENTS.ERROR);
     };
   }, [currentRoom, onGameStart]);
+
+  // 监听主题变化
+  useEffect(() => {
+    const handleThemeChange = (theme: any) => {
+      setCurrentTheme(theme);
+    };
+
+    themeService.addListener(handleThemeChange);
+    
+    return () => {
+      themeService.removeListener(handleThemeChange);
+    };
+  }, []);
 
   const handleConnect = async () => {
     if (!playerName.trim()) {
@@ -149,22 +164,22 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center gap-6 p-8">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border-2 border-amber-200 max-w-md w-full">
+        <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-8 border-2 max-w-md w-full`}>
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-amber-800 mb-2">联机对战</h2>
-            <p className="text-amber-600">连接到服务器开始联机游戏</p>
+            <h2 className={`text-2xl font-bold ${currentTheme.headingColorClass} mb-2`}>联机对战</h2>
+            <p className={`${currentTheme.accentColorClass}`}>连接到服务器开始联机游戏</p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-amber-700 mb-2">
+              <label className={`block text-sm font-medium ${currentTheme.textColorClass} mb-2`}>
                 玩家名称
               </label>
               <input
                 type="text"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`w-full px-4 py-2 border ${currentTheme.boardBorderColor} rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 ${currentTheme.isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
                 placeholder="输入您的名称"
                 maxLength={20}
               />
@@ -205,12 +220,12 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
 
     return (
       <div className="flex flex-col items-center gap-6 p-8">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border-2 border-amber-200 max-w-2xl w-full">
+        <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-6 border-2 max-w-2xl w-full`}>
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-amber-800 mb-2">
+            <h2 className={`text-2xl font-bold ${currentTheme.headingColorClass} mb-2`}>
               房间: {currentRoom.id}
             </h2>
-            <p className="text-amber-600">
+            <p className={`${currentTheme.accentColorClass}`}>
               {currentRoom.gameStarted ? '游戏进行中' : '等待玩家准备'}
             </p>
           </div>
@@ -287,15 +302,15 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
   // 房间列表界面
   return (
     <div className="flex flex-col items-center gap-6 p-8">
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border-2 border-amber-200 max-w-2xl w-full">
+      <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-6 border-2 max-w-2xl w-full`}>
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-amber-800 mb-2">联机大厅</h2>
-          <p className="text-amber-600">欢迎，{playerName}！</p>
+          <h2 className={`text-2xl font-bold ${currentTheme.headingColorClass} mb-2`}>联机大厅</h2>
+          <p className={`${currentTheme.accentColorClass}`}>欢迎，{playerName}！</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">创建房间</h3>
+            <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>创建房间</h3>
             <button
               onClick={handleCreateRoom}
               className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-600 hover:to-emerald-600 transition-all"
@@ -305,13 +320,13 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">加入房间</h3>
+            <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>加入房间</h3>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                className="flex-1 px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`flex-1 px-3 py-2 border ${currentTheme.boardBorderColor} rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 ${currentTheme.isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
                 placeholder="房间ID"
                 maxLength={6}
               />
@@ -327,7 +342,7 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
 
         <div>
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold text-amber-700">房间列表</h3>
+            <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass}`}>房间列表</h3>
             <button
               onClick={refreshRoomList}
               className="px-3 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300 transition-colors"
@@ -338,18 +353,18 @@ export const OnlineGame: React.FC<OnlineGameProps> = ({ onBack, onGameStart }) =
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {roomList.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className={`text-center py-8 ${currentTheme.subTextColorClass}`}>
                 暂无房间，创建一个新房间开始游戏吧！
               </div>
             ) : (
               roomList.map((room) => (
                 <div
                   key={room.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                  className={`flex items-center justify-between p-3 ${currentTheme.isDark ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg border`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-medium">房间 {room.id}</span>
-                    <span className="text-sm text-gray-600">
+                    <span className={`font-medium ${currentTheme.textColorClass}`}>房间 {room.id}</span>
+                    <span className={`text-sm ${currentTheme.subTextColorClass}`}>
                       {room.playerCount}/2 玩家
                     </span>
                     <span className={`text-xs px-2 py-1 rounded ${

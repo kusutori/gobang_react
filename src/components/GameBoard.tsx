@@ -581,7 +581,7 @@ export const GameBoard: React.FC = () => {
         {/* 游戏模式选择 */}
       <div className={`${currentTheme.uiBackgroundClass} rounded-xl shadow-lg p-3 border-2 text-sm`}>
         <div className="flex items-center gap-3">
-          <span className="font-semibold text-gray-800">模式:</span>
+          <span className={`font-semibold ${currentTheme.textColorClass}`}>模式:</span>
           <button
             onClick={() => {
               setGameMode('human');
@@ -627,7 +627,7 @@ export const GameBoard: React.FC = () => {
       <div className={`${currentTheme.uiBackgroundClass} rounded-xl shadow-lg p-4 border-2 text-sm`}>
         <div className="flex items-center justify-between gap-4">
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-800 mb-1">
+            <div className={`text-lg font-bold ${currentTheme.headingColorClass} mb-1`}>
               {gameOver ? (
                 winner === 1 ? '🎉 黑棋获胜' : winner === 2 ? '🎉 白棋获胜' : '平局'
               ) : isAIThinking ? (

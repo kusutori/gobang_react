@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { themeService } from '../services/ThemeService';
 
 interface GameStats {
   totalGames: number;
@@ -20,6 +21,7 @@ export const GameStatsPanel: React.FC = () => {
     currentStreak: 0,
     bestStreak: 0
   });
+  const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
 
   useEffect(() => {
     // 从localStorage加载统计数据
@@ -63,6 +65,19 @@ export const GameStatsPanel: React.FC = () => {
     };
   }, []);
 
+  // 监听主题变化
+  useEffect(() => {
+    const handleThemeChange = (theme: any) => {
+      setCurrentTheme(theme);
+    };
+
+    themeService.addListener(handleThemeChange);
+    
+    return () => {
+      themeService.removeListener(handleThemeChange);
+    };
+  }, []);
+
   const resetStats = () => {
     console.log('重置统计数据');
     const newStats: GameStats = {
@@ -80,12 +95,12 @@ export const GameStatsPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border-2 border-gray-200">
+    <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 border-2`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-800">📊 游戏统计</h3>
+        <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass}`}>📊 游戏统计</h3>
         <button
           onClick={resetStats}
-          className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+          className={`text-xs ${currentTheme.subTextColorClass} hover:${currentTheme.textColorClass} transition-colors`}
           title="重置统计"
         >
           🔄
@@ -94,27 +109,27 @@ export const GameStatsPanel: React.FC = () => {
       
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-600">总局数</span>
-          <span className="font-medium text-gray-800">{stats.totalGames}</span>
+          <span className={`${currentTheme.subTextColorClass}`}>总局数</span>
+          <span className={`font-medium ${currentTheme.textColorClass}`}>{stats.totalGames}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">胜率</span>
+          <span className={`${currentTheme.subTextColorClass}`}>胜率</span>
           <span className="font-medium text-green-600">{stats.winRate.toFixed(1)}%</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">胜局</span>
+          <span className={`${currentTheme.subTextColorClass}`}>胜局</span>
           <span className="font-medium text-green-600">{stats.wins}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">负局</span>
+          <span className={`${currentTheme.subTextColorClass}`}>负局</span>
           <span className="font-medium text-red-600">{stats.losses}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">连胜</span>
+          <span className={`${currentTheme.subTextColorClass}`}>连胜</span>
           <span className="font-medium text-blue-600">{stats.currentStreak}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600">最佳</span>
+          <span className={`${currentTheme.subTextColorClass}`}>最佳</span>
           <span className="font-medium text-purple-600">{stats.bestStreak}</span>
         </div>
       </div>
