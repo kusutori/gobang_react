@@ -520,20 +520,31 @@ export const GameBoard: React.FC = () => {
 
   // 检查游戏结果并播放音效
   useEffect(() => {
-    if (gameOver && winner) {
-      audioService.playSound('win');
+    if (gameOver) {
+      console.log('游戏结束，获胜者:', winner, '游戏模式:', gameMode);
       
-      // 更新统计数据
-      if (gameMode === 'ai') {
-        // AI模式下，玩家是黑棋(1)
-        if (winner === 1) {
-          updateGameStats('win');
-        } else {
-          updateGameStats('lose');
+      if (winner) {
+        audioService.playSound('win');
+        
+        // 更新统计数据
+        if (gameMode === 'ai') {
+          // AI模式下，玩家是黑棋(1)
+          if (winner === 1) {
+            console.log('玩家击败AI，更新胜利统计');
+            updateGameStats('win');
+          } else {
+            console.log('AI击败玩家，更新失败统计');
+            updateGameStats('lose');
+          }
+        } else if (gameMode === 'human') {
+          // 双人模式下
+          console.log('双人模式游戏结束，获胜者:', winner === 1 ? '黑棋' : '白棋');
+          updateGameStats('win'); // 双人模式只记录游戏次数
         }
-      } else if (gameMode === 'human') {
-        // 双人模式，不区分胜负，只记录游戏次数
-        updateGameStats('win'); // 可以根据具体需求修改
+      } else {
+        // 平局情况
+        console.log('游戏平局');
+        updateGameStats('draw');
       }
     }
   }, [gameOver, winner, gameMode]);
