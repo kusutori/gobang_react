@@ -339,9 +339,11 @@ export function App() {
             </div>
           </div>
 
-          {/* 右侧游戏区域 */}
-          <div className="flex-1 flex items-center justify-center p-6 game-area">
-            <GameBoard />
+          {/* 右侧游戏区域 - 自适应棋盘大小 */}
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="w-full h-full max-w-[600px] max-h-[600px] aspect-square">
+              <GameBoard />
+            </div>
           </div>
         </div>
         
