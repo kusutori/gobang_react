@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
 import { AISettings } from './AISettings';
+import { LLMSettings } from './LLMSettings';
 import { ErrorBoundary } from './ErrorBoundary';
 import { themeService } from '../services/ThemeService';
 import { audioService } from '../services/AudioService';
@@ -18,6 +19,7 @@ export const GameBoard: React.FC = () => {
   const boardContainerRef = useRef<PIXI.Container | null>(null);
   const stonesContainerRef = useRef<PIXI.Container | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
+  const [showLLMSettings, setShowLLMSettings] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
   const [cellSize, setCellSize] = useState(MIN_CELL_SIZE);
   const [boardWidth, setBoardWidth] = useState(0);
@@ -527,13 +529,13 @@ export const GameBoard: React.FC = () => {
         audioService.playSound('win');
         
         // 更新统计数据
-        if (gameMode === 'ai') {
-          // AI模式下，玩家是黑棋(1)
+        if (gameMode === 'ai' || gameMode === 'llm') {
+          // AI/LLM模式下，玩家是黑棋(1)
           if (winner === 1) {
-            console.log('玩家击败AI，更新胜利统计');
+            console.log('玩家击败' + (gameMode === 'llm' ? '大模型' : 'AI') + '，更新胜利统计');
             updateGameStats('win');
           } else {
-            console.log('AI击败玩家，更新失败统计');
+            console.log((gameMode === 'llm' ? '大模型' : 'AI') + '击败玩家，更新失败统计');
             updateGameStats('lose');
           }
         } else if (gameMode === 'human') {
@@ -608,6 +610,19 @@ export const GameBoard: React.FC = () => {
           >
             人机
           </button>
+          <button
+            onClick={() => {
+              setGameMode('llm');
+              audioService.playSound('click');
+            }}
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+              gameMode === 'llm' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+            }`}
+          >
+            大模型
+          </button>
           {gameMode === 'ai' && (
             <button
               onClick={() => {
@@ -616,6 +631,18 @@ export const GameBoard: React.FC = () => {
               }}
               className="px-2 py-1 bg-amber-200 text-amber-800 rounded-md hover:bg-amber-300 transition-colors text-sm"
               title="AI设置"
+            >
+              ⚙️
+            </button>
+          )}
+          {gameMode === 'llm' && (
+            <button
+              onClick={() => {
+                setShowLLMSettings(true);
+                audioService.playSound('click');
+              }}
+              className="px-2 py-1 bg-blue-200 text-blue-800 rounded-md hover:bg-blue-300 transition-colors text-sm"
+              title="大模型设置"
             >
               ⚙️
             </button>
@@ -642,8 +669,8 @@ export const GameBoard: React.FC = () => {
                   currentPlayer === 1 ? 'bg-black border-gray-600' : 'bg-white border-gray-400'
                 }`}></div>
                 <span className="text-sm font-medium text-gray-700">
-                  {gameMode === 'ai' ? 
-                    (currentPlayer === 1 ? '玩家' : 'AI') : 
+                  {gameMode === 'ai' || gameMode === 'llm' ? 
+                    (currentPlayer === 1 ? '玩家' : gameMode === 'llm' ? '大模型' : 'AI') : 
                     (currentPlayer === 1 ? '黑棋' : '白棋')
                   }
                 </span>
@@ -711,6 +738,8 @@ export const GameBoard: React.FC = () => {
         <p className="text-xs font-medium">
           {gameMode === 'ai' ? 
             '💡 您执黑棋，点击交叉点落子' : 
+            gameMode === 'llm' ?
+            '💡 您执黑棋，与大模型对战' :
             '💡 点击交叉点落子'
           }
         </p>
@@ -722,6 +751,11 @@ export const GameBoard: React.FC = () => {
       {/* AI 设置弹窗 */}
       {showAISettings && (
         <AISettings onClose={() => setShowAISettings(false)} />
+      )}
+      
+      {/* LLM 设置弹窗 */}
+      {showLLMSettings && (
+        <LLMSettings onClose={() => setShowLLMSettings(false)} />
       )}
     </div>
     </ErrorBoundary>

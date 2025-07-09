@@ -6,7 +6,18 @@ export type CellState = 0 | 1 | 2;
 export type Board = CellState[][];
 
 // 游戏模式
-export type GameMode = "human" | "ai";
+export type GameMode = "human" | "ai" | "llm";
+
+// LLM配置
+export interface LLMConfig {
+  baseUrl: string;
+  modelName: string;
+  apiKey: string;
+  temperature?: number;
+  maxTokens?: number;
+  useProxy?: boolean;
+  proxyUrl?: string;
+}
 
 // 游戏状态
 export interface GameState {
@@ -17,11 +28,13 @@ export interface GameState {
   gameMode: GameMode;
   aiPlayer: AIPlayer | null;
   isAIThinking: boolean;
+  llmConfig: LLMConfig | null;
 
   // 操作方法
   makeMove: (row: number, col: number) => boolean;
   resetGame: () => void;
   setGameMode: (mode: GameMode) => void;
+  setLLMConfig: (config: LLMConfig) => void;
   checkWin: (board: Board, row: number, col: number) => boolean;
 }
 
@@ -98,9 +111,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameMode: "human",
   aiPlayer: null,
   isAIThinking: false,
+  llmConfig: null,
 
   makeMove: (row: number, col: number) => {
-    const { board, currentPlayer, gameOver, gameMode, aiPlayer } = get();
+    const { board, currentPlayer, gameOver, gameMode, aiPlayer, llmConfig } = get();
 
     if (gameOver || board[row][col] !== 0) {
       return false;
@@ -120,15 +134,19 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // 如果是 AI 模式且轮到 AI，让 AI 下棋
     if (
-      gameMode === "ai" &&
+      (gameMode === "ai" || gameMode === "llm") &&
       !hasWon &&
       aiPlayer &&
       (currentPlayer === 1 ? 2 : 1) === aiPlayer.getConfig().player
     ) {
       set({ isAIThinking: true });
 
-      aiPlayer
-        .makeMove(newBoard)
+      // 不同模式的 AI 行为
+      const aiMovePromise = gameMode === "llm" && llmConfig
+        ? aiPlayer.makeLLMMove(newBoard, llmConfig)
+        : aiPlayer.makeMove(newBoard);
+
+      aiMovePromise
         .then((aiMove) => {
           const { board: currentBoard, gameOver: isGameOver } = get();
 
@@ -149,8 +167,14 @@ export const useGameStore = create<GameState>((set, get) => ({
             set({ isAIThinking: false });
           }
         })
-        .catch(() => {
+        .catch((error: Error) => {
+          console.error("AI move error:", error);
           set({ isAIThinking: false });
+
+          // 显示错误通知
+          if (gameMode === "llm") {
+            alert(`大模型API请求失败: ${error.message}\n请检查网络连接和API配置`);
+          }
         });
     }
 
@@ -170,8 +194,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGameMode: (mode: GameMode) => {
     let newAIPlayer: AIPlayer | null = null;
 
-    if (mode === "ai") {
-      newAIPlayer = new AIPlayer(createAIConfig("easy", 2)); // 默认简单难度
+    if (mode === "ai" || mode === "llm") {
+      newAIPlayer = new AIPlayer(createAIConfig("medium", 2)); // 默认中等难度
     }
 
     set({
@@ -183,6 +207,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameOver: false,
       isAIThinking: false,
     });
+  },
+
+  setLLMConfig: (config: LLMConfig) => {
+    set({ llmConfig: config });
   },
 
   checkWin,

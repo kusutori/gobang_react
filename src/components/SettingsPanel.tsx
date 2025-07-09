@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { boardThemes, themeService } from '../services/ThemeService';
 import { audioService, AudioSettings } from '../services/AudioService';
+import { useGameStore } from '../store/gameStore';
+import { AISettings } from './AISettings';
+import { LLMSettings } from './LLMSettings';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -9,6 +12,9 @@ interface SettingsPanelProps {
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(audioService.getSettings());
+  const { gameMode } = useGameStore();
+  const [showAISettings, setShowAISettings] = useState(false);
+  const [showLLMSettings, setShowLLMSettings] = useState(false);
 
   useEffect(() => {
     const handleThemeChange = (theme: any) => {
@@ -73,10 +79,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* 音效设置 */}
-        <div className="mb-6">
+        {/* 音频设置 */}
+        <div className="mb-8">
           <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            🔊 音效设置
+            🔊 音频设置
           </h3>
           
           <div className="space-y-4">
@@ -172,8 +178,148 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           </div>
         </div>
 
+        {/* 游戏AI设置 */}
+        {(gameMode === 'ai' || gameMode === 'llm') && (
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              🤖 AI 设置
+            </h3>
+            <div className="space-y-4">
+              {/* AI 难度设置 */}
+              <button
+                onClick={() => setShowAISettings(true)}
+                className="w-full p-3 bg-gradient-to-r from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 
+                         text-amber-800 rounded-lg flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🎮</span>
+                  <div>
+                    <div className="font-medium text-left">AI 难度设置</div>
+                    <div className="text-sm text-amber-700">调整AI思考深度和反应时间</div>
+                  </div>
+                </div>
+                <span className="text-xl">→</span>
+              </button>
+              
+              {/* LLM 大模型设置 */}
+              <button
+                onClick={() => setShowLLMSettings(true)}
+                className="w-full p-3 bg-gradient-to-r from-blue-100 to-blue-200 hover:from-blue-200 hover:to-blue-300 
+                         text-blue-800 rounded-lg flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🧠</span>
+                  <div>
+                    <div className="font-medium text-left">大模型设置</div>
+                    <div className="text-sm text-blue-700">配置OpenAI或兼容接口</div>
+                  </div>
+                </div>
+                <span className="text-xl">→</span>
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+            🔊 音频设置
+          </h3>
+          <div className="space-y-4">
+            {/* 背景音乐开关 */}
+            <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎵</span>
+                <div>
+                  <div className="font-medium text-gray-800">背景音乐</div>
+                  <div className="text-sm text-gray-600">播放轻柔的背景音乐</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleAudioSettingChange('bgmEnabled', !audioSettings.bgmEnabled)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  audioSettings.bgmEnabled ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                    audioSettings.bgmEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 音效开关 */}
+            <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔔</span>
+                <div>
+                  <div className="font-medium text-gray-800">音效</div>
+                  <div className="text-sm text-gray-600">落子和按钮点击音效</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleAudioSettingChange('soundEnabled', !audioSettings.soundEnabled)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  audioSettings.soundEnabled ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                    audioSettings.soundEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 背景音乐音量 */}
+            {audioSettings.bgmEnabled && (
+              <div className="p-3 bg-white/50 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-xl">🎼</span>
+                  <span className="font-medium text-gray-800">背景音乐音量</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={audioSettings.bgmVolume}
+                  onChange={(e) => handleAudioSettingChange('bgmVolume', parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="text-sm text-gray-600 mt-1">
+                  {Math.round(audioSettings.bgmVolume * 100)}%
+                </div>
+              </div>
+            )}
+
+            {/* 音效音量 */}
+            {audioSettings.soundEnabled && (
+              <div className="p-3 bg-white/50 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-xl">🔊</span>
+                  <span className="font-medium text-gray-800">音效音量</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={audioSettings.soundVolume}
+                  onChange={(e) => handleAudioSettingChange('soundVolume', parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="text-sm text-gray-600 mt-1">
+                  {Math.round(audioSettings.soundVolume * 100)}%
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* AI 设置和 LLM 设置 - 删除这部分，使用上面的条件渲染版本 */}
+
         {/* 测试按钮 */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 mb-4">
           <button
             onClick={() => audioService.playSound('place_stone')}
             className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -187,6 +333,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             测试胜利音效
           </button>
         </div>
+
+        {/* 弹出式设置面板 */}
+        {showAISettings && (
+          <AISettings onClose={() => setShowAISettings(false)} />
+        )}
+
+        {showLLMSettings && (
+          <LLMSettings onClose={() => setShowLLMSettings(false)} />
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { GameBoard } from "./components/GameBoard";
-import { SimpleGameBoard } from "./components/SimpleGameBoard";
 import { OnlineGame } from "./components/OnlineGame";
 import { OnlineGameBoard } from "./components/OnlineGameBoard";
 import { SettingsPanel } from "./components/SettingsPanel";
