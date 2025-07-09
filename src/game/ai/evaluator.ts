@@ -1,4 +1,4 @@
-import { CellState, Board } from '../../store/gameStore';
+import { CellState, Board } from "../../store/gameStore";
 
 // 棋型评分表
 const PATTERNS = {
@@ -22,10 +22,10 @@ const PATTERNS = {
 
 // 方向向量：横、竖、正斜、反斜
 const DIRECTIONS = [
-  [0, 1],   // 水平
-  [1, 0],   // 垂直
-  [1, 1],   // 正斜
-  [1, -1],  // 反斜
+  [0, 1], // 水平
+  [1, 0], // 垂直
+  [1, 1], // 正斜
+  [1, -1], // 反斜
 ];
 
 /**
@@ -86,19 +86,31 @@ function getLineInfo(
 /**
  * 根据连子数量和阻挡情况评估棋型分数
  */
-function getPatternScore(count: number, leftBlocked: boolean, rightBlocked: boolean): number {
+function getPatternScore(
+  count: number,
+  leftBlocked: boolean,
+  rightBlocked: boolean
+): number {
   if (count >= 5) return PATTERNS.FIVE;
-  
+
   const blocked = leftBlocked && rightBlocked;
   const halfBlocked = leftBlocked || rightBlocked;
-  
+
   switch (count) {
     case 4:
-      return blocked ? 0 : (halfBlocked ? PATTERNS.RUSH_FOUR : PATTERNS.LIVE_FOUR);
+      return blocked
+        ? 0
+        : halfBlocked
+        ? PATTERNS.RUSH_FOUR
+        : PATTERNS.LIVE_FOUR;
     case 3:
-      return blocked ? 0 : (halfBlocked ? PATTERNS.RUSH_THREE : PATTERNS.LIVE_THREE);
+      return blocked
+        ? 0
+        : halfBlocked
+        ? PATTERNS.RUSH_THREE
+        : PATTERNS.LIVE_THREE;
     case 2:
-      return blocked ? 0 : (halfBlocked ? PATTERNS.RUSH_TWO : PATTERNS.LIVE_TWO);
+      return blocked ? 0 : halfBlocked ? PATTERNS.RUSH_TWO : PATTERNS.LIVE_TWO;
     case 1:
       return blocked ? 0 : PATTERNS.LIVE_ONE;
     default:
@@ -109,21 +121,30 @@ function getPatternScore(count: number, leftBlocked: boolean, rightBlocked: bool
 /**
  * 评估单个位置的分数
  */
-function evaluatePosition(board: Board, row: number, col: number, player: CellState): number {
+function evaluatePosition(
+  board: Board,
+  row: number,
+  col: number,
+  player: CellState
+): number {
   if (board[row][col] !== 0) return 0;
-  
+
   // 临时放置棋子
-  const tempBoard = board.map(r => [...r]);
+  const tempBoard = board.map((r) => [...r]);
   tempBoard[row][col] = player;
-  
+
   let score = 0;
-  
+
   // 检查四个方向
   for (const direction of DIRECTIONS) {
     const lineInfo = getLineInfo(tempBoard, row, col, direction, player);
-    score += getPatternScore(lineInfo.count, lineInfo.leftBlocked, lineInfo.rightBlocked);
+    score += getPatternScore(
+      lineInfo.count,
+      lineInfo.leftBlocked,
+      lineInfo.rightBlocked
+    );
   }
-  
+
   return score;
 }
 
@@ -133,7 +154,7 @@ function evaluatePosition(board: Board, row: number, col: number, player: CellSt
 export function evaluateBoard(board: Board, player: CellState): number {
   let score = 0;
   const opponent = player === 1 ? 2 : 1;
-  
+
   // 评估每个位置
   for (let row = 0; row < 15; row++) {
     for (let col = 0; col < 15; col++) {
@@ -145,17 +166,20 @@ export function evaluateBoard(board: Board, player: CellState): number {
       }
     }
   }
-  
+
   return score;
 }
 
 /**
  * 获取可能的落子位置（启发式搜索）
  */
-export function getPossibleMoves(board: Board, maxMoves: number = 15): Array<[number, number]> {
+export function getPossibleMoves(
+  board: Board,
+  maxMoves: number = 15
+): Array<[number, number]> {
   const moves: Array<[number, number, number]> = []; // [row, col, priority]
   const hasStone = new Set<string>();
-  
+
   // 找出所有已有棋子的位置
   for (let row = 0; row < 15; row++) {
     for (let col = 0; col < 15; col++) {
@@ -164,46 +188,50 @@ export function getPossibleMoves(board: Board, maxMoves: number = 15): Array<[nu
       }
     }
   }
-  
+
   // 如果是空棋盘，返回中心位置
   if (hasStone.size === 0) {
     return [[7, 7]];
   }
-  
+
   // 找出所有棋子周围的空位置，并根据距离给出优先级
   const candidates = new Map<string, number>();
-  
+
   for (const posStr of hasStone) {
-    const [row, col] = posStr.split(',').map(Number);
-    
+    const [row, col] = posStr.split(",").map(Number);
+
     // 检查周围位置，距离越近优先级越高
     for (let dr = -2; dr <= 2; dr++) {
       for (let dc = -2; dc <= 2; dc++) {
         if (dr === 0 && dc === 0) continue;
-        
+
         const newRow = row + dr;
         const newCol = col + dc;
-        
-        if (isValidPosition(newRow, newCol) && 
-            board[newRow][newCol] === 0 && 
-            !hasStone.has(`${newRow},${newCol}`)) {
-          
+
+        if (
+          isValidPosition(newRow, newCol) &&
+          board[newRow][newCol] === 0 &&
+          !hasStone.has(`${newRow},${newCol}`)
+        ) {
           const posKey = `${newRow},${newCol}`;
           const distance = Math.abs(dr) + Math.abs(dc);
           const priority = 5 - distance; // 距离越近优先级越高
-          
-          candidates.set(posKey, Math.max(candidates.get(posKey) || 0, priority));
+
+          candidates.set(
+            posKey,
+            Math.max(candidates.get(posKey) || 0, priority)
+          );
         }
       }
     }
   }
-  
+
   // 将候选位置按优先级排序
   for (const [posStr, priority] of candidates) {
-    const [row, col] = posStr.split(',').map(Number);
+    const [row, col] = posStr.split(",").map(Number);
     moves.push([row, col, priority]);
   }
-  
+
   // 按优先级排序并返回前N个
   moves.sort((a, b) => b[2] - a[2]);
   return moves.slice(0, maxMoves).map(([row, col]) => [row, col]);
@@ -212,10 +240,15 @@ export function getPossibleMoves(board: Board, maxMoves: number = 15): Array<[nu
 /**
  * 检查是否是必胜/必败的位置
  */
-export function isWinningMove(board: Board, row: number, col: number, player: CellState): boolean {
-  const tempBoard = board.map(r => [...r]);
+export function isWinningMove(
+  board: Board,
+  row: number,
+  col: number,
+  player: CellState
+): boolean {
+  const tempBoard = board.map((r) => [...r]);
   tempBoard[row][col] = player;
-  
+
   // 检查四个方向是否有五子连珠
   for (const direction of DIRECTIONS) {
     const lineInfo = getLineInfo(tempBoard, row, col, direction, player);
@@ -223,6 +256,6 @@ export function isWinningMove(board: Board, row: number, col: number, player: Ce
       return true;
     }
   }
-  
+
   return false;
 }

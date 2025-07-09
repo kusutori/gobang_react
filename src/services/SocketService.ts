@@ -1,29 +1,29 @@
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
 
 // 事件名称常量（与服务器保持一致）
 export const SOCKET_EVENTS = {
   // 客户端发送的事件
-  CREATE_ROOM: 'create-room',
-  JOIN_ROOM: 'join-room',
-  LEAVE_ROOM: 'leave-room',
-  PLAYER_READY: 'player-ready',
-  MAKE_MOVE: 'make-move',
-  RESET_GAME: 'reset-game',
-  GET_ROOM_LIST: 'get-room-list',
-  
+  CREATE_ROOM: "create-room",
+  JOIN_ROOM: "join-room",
+  LEAVE_ROOM: "leave-room",
+  PLAYER_READY: "player-ready",
+  MAKE_MOVE: "make-move",
+  RESET_GAME: "reset-game",
+  GET_ROOM_LIST: "get-room-list",
+
   // 服务器发送的事件
-  ROOM_CREATED: 'room-created',
-  ROOM_JOINED: 'room-joined',
-  ROOM_LEFT: 'room-left',
-  PLAYER_JOINED: 'player-joined',
-  PLAYER_LEFT: 'player-left',
-  PLAYER_READY_UPDATE: 'player-ready-update',
-  GAME_STARTED: 'game-started',
-  MOVE_MADE: 'move-made',
-  GAME_OVER: 'game-over',
-  GAME_RESET: 'game-reset',
-  ROOM_LIST: 'room-list',
-  ERROR: 'error'
+  ROOM_CREATED: "room-created",
+  ROOM_JOINED: "room-joined",
+  ROOM_LEFT: "room-left",
+  PLAYER_JOINED: "player-joined",
+  PLAYER_LEFT: "player-left",
+  PLAYER_READY_UPDATE: "player-ready-update",
+  GAME_STARTED: "game-started",
+  MOVE_MADE: "move-made",
+  GAME_OVER: "game-over",
+  GAME_RESET: "game-reset",
+  ROOM_LIST: "room-list",
+  ERROR: "error",
 };
 
 // 房间数据类型
@@ -51,7 +51,7 @@ export class SocketService {
   private serverUrl: string;
   private listeners: Map<string, ((...args: any[]) => void)[]> = new Map();
 
-  constructor(serverUrl: string = 'http://localhost:3001') {
+  constructor(serverUrl: string = "http://localhost:3001") {
     this.serverUrl = serverUrl;
   }
 
@@ -64,28 +64,28 @@ export class SocketService {
       }
 
       this.socket = io(this.serverUrl, {
-        transports: ['websocket', 'polling'],
+        transports: ["websocket", "polling"],
         upgrade: true,
-        rememberUpgrade: true
+        rememberUpgrade: true,
       });
 
-      this.socket.on('connect', () => {
-        console.log('Socket.IO 连接成功:', this.socket?.id);
+      this.socket.on("connect", () => {
+        console.log("Socket.IO 连接成功:", this.socket?.id);
         resolve();
       });
 
-      this.socket.on('connect_error', (error: any) => {
-        console.error('Socket.IO 连接错误:', error);
+      this.socket.on("connect_error", (error: any) => {
+        console.error("Socket.IO 连接错误:", error);
         reject(error);
       });
 
-      this.socket.on('disconnect', (reason: any) => {
-        console.log('Socket.IO 断开连接:', reason);
+      this.socket.on("disconnect", (reason: any) => {
+        console.log("Socket.IO 断开连接:", reason);
       });
 
       // 重新注册所有监听器
       this.listeners.forEach((callbacks, event) => {
-        callbacks.forEach(callback => {
+        callbacks.forEach((callback) => {
           this.socket?.on(event, callback);
         });
       });
@@ -116,7 +116,7 @@ export class SocketService {
       this.listeners.set(event, []);
     }
     this.listeners.get(event)?.push(callback);
-    
+
     if (this.socket) {
       this.socket.on(event, callback);
     }
@@ -142,7 +142,7 @@ export class SocketService {
     if (this.socket?.connected) {
       this.socket.emit(event, data);
     } else {
-      console.warn('Socket未连接，无法发送事件:', event);
+      console.warn("Socket未连接，无法发送事件:", event);
     }
   }
 

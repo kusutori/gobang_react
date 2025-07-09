@@ -1,5 +1,5 @@
-import { Board, CellState } from '../../store/gameStore';
-import { getAIMoveAsync, AIMove } from './minimax';
+import { Board, CellState } from "../../store/gameStore";
+import { getAIMoveAsync, AIMove } from "./minimax";
 
 export interface AIConfig {
   difficulty: number; // 1-5, 影响搜索深度
@@ -20,29 +20,29 @@ export class AIPlayer {
    */
   async makeMove(board: Board): Promise<AIMove> {
     if (this.isThinking) {
-      throw new Error('AI is already thinking');
+      throw new Error("AI is already thinking");
     }
 
     this.isThinking = true;
-    
+
     try {
       // 添加思考时间
       const startTime = Date.now();
-      
+
       const move = await getAIMoveAsync(
         board,
         this.config.player,
         this.config.difficulty
       );
-      
+
       // 确保至少有最小思考时间
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, this.config.thinkingTime - elapsedTime);
-      
+
       if (remainingTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, remainingTime));
+        await new Promise((resolve) => setTimeout(resolve, remainingTime));
       }
-      
+
       return move;
     } finally {
       this.isThinking = false;
@@ -74,23 +74,26 @@ export class AIPlayer {
 /**
  * 创建不同难度的 AI 配置
  */
-export function createAIConfig(difficulty: 'easy' | 'medium' | 'hard', player: CellState): AIConfig {
+export function createAIConfig(
+  difficulty: "easy" | "medium" | "hard",
+  player: CellState
+): AIConfig {
   const configs = {
     easy: {
       difficulty: 1,
       thinkingTime: 300,
-      player
+      player,
     },
     medium: {
       difficulty: 2,
       thinkingTime: 800,
-      player
+      player,
     },
     hard: {
       difficulty: 3,
       thinkingTime: 1200,
-      player
-    }
+      player,
+    },
   };
 
   return configs[difficulty];

@@ -32,7 +32,9 @@ export interface MoveData {
 
 // 创建空棋盘
 export function createEmptyBoard(): Board {
-  return Array(15).fill(null).map(() => Array(15).fill(0));
+  return Array(15)
+    .fill(null)
+    .map(() => Array(15).fill(0));
 }
 
 // 检查胜利条件
@@ -42,10 +44,10 @@ export function checkWin(board: Board, row: number, col: number): boolean {
 
   // 四个方向：水平、垂直、正斜、反斜
   const directions = [
-    [0, 1],  // 水平
-    [1, 0],  // 垂直
-    [1, 1],  // 正斜
-    [1, -1]  // 反斜
+    [0, 1], // 水平
+    [1, 0], // 垂直
+    [1, 1], // 正斜
+    [1, -1], // 反斜
   ];
 
   for (const [dx, dy] of directions) {
@@ -55,7 +57,13 @@ export function checkWin(board: Board, row: number, col: number): boolean {
     for (let i = 1; i < 5; i++) {
       const newRow = row + dx * i;
       const newCol = col + dy * i;
-      if (newRow >= 0 && newRow < 15 && newCol >= 0 && newCol < 15 && board[newRow][newCol] === player) {
+      if (
+        newRow >= 0 &&
+        newRow < 15 &&
+        newCol >= 0 &&
+        newCol < 15 &&
+        board[newRow][newCol] === player
+      ) {
         count++;
       } else {
         break;
@@ -66,7 +74,13 @@ export function checkWin(board: Board, row: number, col: number): boolean {
     for (let i = 1; i < 5; i++) {
       const newRow = row - dx * i;
       const newCol = col - dy * i;
-      if (newRow >= 0 && newRow < 15 && newCol >= 0 && newCol < 15 && board[newRow][newCol] === player) {
+      if (
+        newRow >= 0 &&
+        newRow < 15 &&
+        newCol >= 0 &&
+        newCol < 15 &&
+        board[newRow][newCol] === player
+      ) {
         count++;
       } else {
         break;
@@ -96,8 +110,8 @@ export class GameManager {
           id: playerId,
           name: playerName,
           player: 1, // 房主默认为黑棋
-          ready: false
-        }
+          ready: false,
+        },
       },
       board: createEmptyBoard(),
       currentPlayer: 1,
@@ -106,22 +120,26 @@ export class GameManager {
       winner: null,
       spectators: [],
       createdAt: new Date(),
-      lastActivity: new Date()
+      lastActivity: new Date(),
     };
 
     this.rooms.set(roomId, room);
     this.playerRooms.set(playerId, roomId);
-    
+
     return room;
   }
 
   // 加入房间
-  joinRoom(roomId: string, playerId: string, playerName: string): GameRoom | null {
+  joinRoom(
+    roomId: string,
+    playerId: string,
+    playerName: string
+  ): GameRoom | null {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
     const playerCount = Object.keys(room.players).length;
-    
+
     if (playerCount >= 2) {
       // 作为观众加入
       room.spectators.push(playerId);
@@ -131,13 +149,13 @@ export class GameManager {
         id: playerId,
         name: playerName,
         player: 2, // 后加入的玩家为白棋
-        ready: false
+        ready: false,
       };
     }
 
     this.playerRooms.set(playerId, roomId);
     room.lastActivity = new Date();
-    
+
     return room;
   }
 
@@ -151,15 +169,18 @@ export class GameManager {
 
     // 从玩家中移除
     delete room.players[playerId];
-    
+
     // 从观众中移除
-    room.spectators = room.spectators.filter(id => id !== playerId);
-    
+    room.spectators = room.spectators.filter((id) => id !== playerId);
+
     // 清除玩家房间映射
     this.playerRooms.delete(playerId);
 
     // 如果房间没有玩家了，删除房间
-    if (Object.keys(room.players).length === 0 && room.spectators.length === 0) {
+    if (
+      Object.keys(room.players).length === 0 &&
+      room.spectators.length === 0
+    ) {
       this.rooms.delete(roomId);
     }
   }
@@ -177,7 +198,10 @@ export class GameManager {
 
     // 检查是否可以开始游戏
     const playerIds = Object.keys(room.players);
-    if (playerIds.length === 2 && playerIds.every(id => room.players[id].ready)) {
+    if (
+      playerIds.length === 2 &&
+      playerIds.every((id) => room.players[id].ready)
+    ) {
       room.gameStarted = true;
     }
 
@@ -185,7 +209,11 @@ export class GameManager {
   }
 
   // 执行移动
-  makeMove(playerId: string, row: number, col: number): { room: GameRoom | null, valid: boolean } {
+  makeMove(
+    playerId: string,
+    row: number,
+    col: number
+  ): { room: GameRoom | null; valid: boolean } {
     const roomId = this.playerRooms.get(playerId);
     if (!roomId) return { room: null, valid: false };
 
@@ -200,7 +228,13 @@ export class GameManager {
     }
 
     // 检查位置是否有效
-    if (row < 0 || row >= 15 || col < 0 || col >= 15 || room.board[row][col] !== 0) {
+    if (
+      row < 0 ||
+      row >= 15 ||
+      col < 0 ||
+      col >= 15 ||
+      room.board[row][col] !== 0
+    ) {
       return { room: null, valid: false };
     }
 
@@ -233,7 +267,7 @@ export class GameManager {
     room.lastActivity = new Date();
 
     // 重置玩家准备状态
-    Object.values(room.players).forEach(player => {
+    Object.values(room.players).forEach((player) => {
       player.ready = false;
     });
 
@@ -252,11 +286,15 @@ export class GameManager {
   }
 
   // 获取所有房间列表
-  getRoomList(): Array<{id: string, playerCount: number, gameStarted: boolean}> {
-    return Array.from(this.rooms.values()).map(room => ({
+  getRoomList(): Array<{
+    id: string;
+    playerCount: number;
+    gameStarted: boolean;
+  }> {
+    return Array.from(this.rooms.values()).map((room) => ({
       id: room.id,
       playerCount: Object.keys(room.players).length,
-      gameStarted: room.gameStarted
+      gameStarted: room.gameStarted,
     }));
   }
 
@@ -268,13 +306,13 @@ export class GameManager {
     for (const [roomId, room] of this.rooms.entries()) {
       if (now.getTime() - room.lastActivity.getTime() > INACTIVE_TIMEOUT) {
         // 清理所有玩家的房间映射
-        Object.keys(room.players).forEach(playerId => {
+        Object.keys(room.players).forEach((playerId) => {
           this.playerRooms.delete(playerId);
         });
-        room.spectators.forEach(playerId => {
+        room.spectators.forEach((playerId) => {
           this.playerRooms.delete(playerId);
         });
-        
+
         this.rooms.delete(roomId);
       }
     }
