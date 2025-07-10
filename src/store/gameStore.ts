@@ -1,13 +1,14 @@
 import { create } from "zustand";
 import { AIPlayer, createAIConfig } from "../game/ai/AIPlayer";
 import { yiXinService } from "../services/YiXinService";
+import { AdvancedAI, AdvancedAIConfig } from "../game/ai/AdvancedAI";
 
 // 棋盘状态：0-空, 1-黑棋, 2-白棋
 export type CellState = 0 | 1 | 2;
 export type Board = CellState[][];
 
 // 游戏模式
-export type GameMode = "human" | "ai" | "llm" | "yixin";
+export type GameMode = "human" | "ai" | "llm" | "yixin" | "advanced";
 
 // LLM配置
 export interface LLMConfig {
@@ -30,6 +31,8 @@ export interface GameState {
   aiPlayer: AIPlayer | null;
   isAIThinking: boolean;
   llmConfig: LLMConfig | null;
+  advancedAI: AdvancedAI | null;
+  advancedAIConfig: AdvancedAIConfig | null;
   moveHistory: Array<[number, number]>; // 新增：记录落子历史
 
   // 操作方法
@@ -37,6 +40,7 @@ export interface GameState {
   resetGame: () => void;
   setGameMode: (mode: GameMode) => void;
   setLLMConfig: (config: LLMConfig) => void;
+  setAdvancedAIConfig: (config: AdvancedAIConfig) => void;
   checkWin: (board: Board, row: number, col: number) => boolean;
 }
 
@@ -114,6 +118,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   aiPlayer: null,
   isAIThinking: false,
   llmConfig: null,
+  advancedAI: null,
+  advancedAIConfig: null,
   moveHistory: [], // 初始化落子历史
 
   makeMove: (row: number, col: number) => {
@@ -145,9 +151,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       moveHistory: newMoveHistory,
     });
 
-    // 如果是 AI/LLM/弈心 模式且轮到 AI，让 AI 下棋
+    // 如果是 AI/LLM/弈心/高级AI 模式且轮到 AI，让 AI 下棋
     if (
-      (gameMode === "ai" || gameMode === "llm" || gameMode === "yixin") &&
+      (gameMode === "ai" ||
+        gameMode === "llm" ||
+        gameMode === "yixin" ||
+        gameMode === "advanced") &&
       !hasWon &&
       (currentPlayer === 1 ? 2 : 1) === 2 // AI总是白棋(2)
     ) {
@@ -158,6 +167,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (gameMode === "yixin") {
         // 弈心模式：使用完整的落子历史
         aiMovePromise = yiXinService.getMove(newMoveHistory);
+      } else if (gameMode === "advanced") {
+        // 高级AI模式
+        const { advancedAI } = get();
+        if (advancedAI) {
+          aiMovePromise = advancedAI.getMove(newBoard, 2).then((result) => ({
+            row: result.row,
+            col: result.col,
+            score: result.confidence,
+          }));
+        } else {
+          // 如果没有高级AI实例，创建一个
+          const newAdvancedAI = new AdvancedAI();
+          set({ advancedAI: newAdvancedAI });
+          aiMovePromise = newAdvancedAI.getMove(newBoard, 2).then((result) => ({
+            row: result.row,
+            col: result.col,
+            score: result.confidence,
+          }));
+        }
       } else if (gameMode === "llm" && llmConfig && aiPlayer) {
         // LLM模式
         aiMovePromise = aiPlayer.makeLLMMove(newBoard, llmConfig);
@@ -277,6 +305,22 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setLLMConfig: (config: LLMConfig) => {
     set({ llmConfig: config });
+  },
+
+  setAdvancedAIConfig: (config: AdvancedAIConfig) => {
+    set((state) => {
+      // Update existing advanced AI or create new one
+      if (state.advancedAI) {
+        state.advancedAI.updateConfig(config);
+      } else {
+        const newAdvancedAI = new AdvancedAI(config);
+        return {
+          advancedAI: newAdvancedAI,
+          advancedAIConfig: config,
+        };
+      }
+      return { advancedAIConfig: config };
+    });
   },
 
   checkWin,

@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
 import { AISettings } from './AISettings';
 import { LLMSettings } from './LLMSettings';
+import { AdvancedAISettings } from './AdvancedAISettings';
 import { ErrorBoundary } from './ErrorBoundary';
 import { themeService } from '../services/ThemeService';
 import { audioService } from '../services/AudioService';
@@ -20,6 +21,7 @@ export const GameBoard: React.FC = () => {
   const stonesContainerRef = useRef<PIXI.Container | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showLLMSettings, setShowLLMSettings] = useState(false);
+  const [showAdvancedAISettings, setShowAdvancedAISettings] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
   const [cellSize, setCellSize] = useState(MIN_CELL_SIZE);
   const [boardWidth, setBoardWidth] = useState(0);
@@ -539,13 +541,19 @@ export const GameBoard: React.FC = () => {
         audioService.playSound('win');
         
         // 更新统计数据
-        if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin') {
-          // AI/LLM/弈心模式下，玩家是黑棋(1)
+        if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced') {
+          // AI/LLM/弈心/高级AI模式下，玩家是黑棋(1)
           if (winner === 1) {
-            console.log('玩家击败' + (gameMode === 'llm' ? '大模型' : gameMode === 'yixin' ? '弈心' : 'AI') + '，更新胜利统计');
+            const aiName = gameMode === 'llm' ? '大模型' : 
+                          gameMode === 'yixin' ? '弈心' : 
+                          gameMode === 'advanced' ? '高级AI' : 'AI';
+            console.log('玩家击败' + aiName + '，更新胜利统计');
             updateGameStats('win');
           } else {
-            console.log((gameMode === 'llm' ? '大模型' : gameMode === 'yixin' ? '弈心' : 'AI') + '击败玩家，更新失败统计');
+            const aiName = gameMode === 'llm' ? '大模型' : 
+                          gameMode === 'yixin' ? '弈心' : 
+                          gameMode === 'advanced' ? '高级AI' : 'AI';
+            console.log(aiName + '击败玩家，更新失败统计');
             updateGameStats('lose');
           }
         } else if (gameMode === 'human') {
@@ -646,6 +654,19 @@ export const GameBoard: React.FC = () => {
           >
             弈心
           </button>
+          <button
+            onClick={() => {
+              setGameMode('advanced');
+              audioService.playSound('click');
+            }}
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+              gameMode === 'advanced' 
+                ? 'bg-emerald-500 text-white shadow-md' 
+                : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+            }`}
+          >
+            高级AI
+          </button>
           {gameMode === 'ai' && (
             <button
               onClick={() => {
@@ -670,6 +691,18 @@ export const GameBoard: React.FC = () => {
               ⚙️
             </button>
           )}
+          {gameMode === 'advanced' && (
+            <button
+              onClick={() => {
+                setShowAdvancedAISettings(true);
+                audioService.playSound('click');
+              }}
+              className="px-2 py-1 bg-emerald-200 text-emerald-800 rounded-md hover:bg-emerald-300 transition-colors text-sm"
+              title="高级AI设置"
+            >
+              ⚙️
+            </button>
+          )}
         </div>
       </div>
 
@@ -681,7 +714,9 @@ export const GameBoard: React.FC = () => {
               {gameOver ? (
                 winner === 1 ? '🎉 黑棋获胜' : winner === 2 ? '🎉 白棋获胜' : '平局'
               ) : isAIThinking ? (
-                '🤖 ' + (gameMode === 'yixin' ? '弈心' : gameMode === 'llm' ? 'AI' : 'AI') + '思考中'
+                '🤖 ' + (gameMode === 'yixin' ? '弈心' : 
+                         gameMode === 'llm' ? 'AI' : 
+                         gameMode === 'advanced' ? '高级AI' : 'AI') + '思考中'
               ) : (
                 `当前回合`
               )}
@@ -692,10 +727,11 @@ export const GameBoard: React.FC = () => {
                   currentPlayer === 1 ? 'bg-black border-gray-600' : 'bg-white border-gray-400'
                 }`}></div>
                 <span className="text-sm font-medium text-gray-700">
-                  {gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' ? 
+                  {gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced' ? 
                     (currentPlayer === 1 ? '玩家' : 
                       gameMode === 'llm' ? '大模型' : 
-                      gameMode === 'yixin' ? '弈心' : 'AI') : 
+                      gameMode === 'yixin' ? '弈心' : 
+                      gameMode === 'advanced' ? '高级AI' : 'AI') : 
                     (currentPlayer === 1 ? '黑棋' : '白棋')
                   }
                 </span>
@@ -767,6 +803,8 @@ export const GameBoard: React.FC = () => {
             '💡 您执黑棋，与大模型对战' :
             gameMode === 'yixin' ?
             '💡 您执黑棋，与弈心引擎对战' :
+            gameMode === 'advanced' ?
+            '💡 您执黑棋，与高级AI对战' :
             '💡 点击交叉点落子'
           }
         </p>
@@ -783,6 +821,17 @@ export const GameBoard: React.FC = () => {
       {/* LLM 设置弹窗 */}
       {showLLMSettings && (
         <LLMSettings onClose={() => setShowLLMSettings(false)} />
+      )}
+      
+      {/* 高级AI 设置弹窗 */}
+      {showAdvancedAISettings && (
+        <AdvancedAISettings 
+          onClose={() => setShowAdvancedAISettings(false)} 
+          onConfigChange={(config) => {
+            const { setAdvancedAIConfig } = useGameStore.getState();
+            setAdvancedAIConfig(config);
+          }}
+        />
       )}
     </div>
     </ErrorBoundary>
