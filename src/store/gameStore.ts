@@ -34,6 +34,7 @@ export interface GameState {
   advancedAI: AdvancedAI | null;
   advancedAIConfig: AdvancedAIConfig | null;
   moveHistory: Array<[number, number]>; // 新增：记录落子历史
+  aiFirst: boolean; // 新增：AI是否先手
 
   // 操作方法
   makeMove: (row: number, col: number) => boolean;
@@ -43,6 +44,7 @@ export interface GameState {
   setAdvancedAIConfig: (config: AdvancedAIConfig) => void;
   checkWin: (board: Board, row: number, col: number) => boolean;
   undoMove: () => boolean; // 新增：悔棋功能
+  setAIFirst: (aiFirst: boolean) => void; // 新增：设置AI先手
 }
 
 // 创建空棋盘
@@ -122,6 +124,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   advancedAI: null,
   advancedAIConfig: null,
   moveHistory: [], // 初始化落子历史
+  aiFirst: false, // 初始化：默认玩家先手
 
   makeMove: (row: number, col: number) => {
     const {
@@ -129,9 +132,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentPlayer,
       gameOver,
       gameMode,
-      aiPlayer,
+      aiPlayer: aiPlayerInstance,
       llmConfig,
       moveHistory,
+      aiFirst,
     } = get();
 
     if (gameOver || board[row][col] !== 0) {
@@ -153,13 +157,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
 
     // 如果是 AI/LLM/弈心/高级AI 模式且轮到 AI，让 AI 下棋
+    const aiPlayerNumber = aiFirst ? 1 : 2; // AI先手时AI是黑棋(1)，否则是白棋(2)
+    const nextPlayer = currentPlayer === 1 ? 2 : 1;
+
     if (
       (gameMode === "ai" ||
         gameMode === "llm" ||
         gameMode === "yixin" ||
         gameMode === "advanced") &&
       !hasWon &&
-      (currentPlayer === 1 ? 2 : 1) === 2 // AI总是白棋(2)
+      nextPlayer === aiPlayerNumber
     ) {
       set({ isAIThinking: true });
 
@@ -187,12 +194,12 @@ export const useGameStore = create<GameState>((set, get) => ({
             score: result.confidence,
           }));
         }
-      } else if (gameMode === "llm" && llmConfig && aiPlayer) {
+      } else if (gameMode === "llm" && llmConfig && aiPlayerInstance) {
         // LLM模式
-        aiMovePromise = aiPlayer.makeLLMMove(newBoard, llmConfig);
-      } else if (aiPlayer) {
+        aiMovePromise = aiPlayerInstance.makeLLMMove(newBoard, llmConfig);
+      } else if (aiPlayerInstance) {
         // 传统AI模式
-        aiMovePromise = aiPlayer.makeMove(newBoard);
+        aiMovePromise = aiPlayerInstance.makeMove(newBoard);
       } else {
         // 没有可用的AI，结束思考状态
         set({ isAIThinking: false });
@@ -206,12 +213,13 @@ export const useGameStore = create<GameState>((set, get) => ({
             gameOver: isGameOver,
             gameMode: currentMode,
             moveHistory: currentHistory,
+            aiFirst,
           } = get();
 
           if (!isGameOver && currentBoard[aiMove.row][aiMove.col] === 0) {
             const aiBoard = currentBoard.map((row) => [...row]);
-            const aiPlayerNumber = 2; // AI总是白棋
-            aiBoard[aiMove.row][aiMove.col] = aiPlayerNumber;
+            const currentAIPlayer = aiFirst ? 1 : 2; // AI先手时是黑棋(1)，否则是白棋(2)
+            aiBoard[aiMove.row][aiMove.col] = currentAIPlayer;
 
             const aiWon = checkWin(aiBoard, aiMove.row, aiMove.col);
             const updatedHistory = [
@@ -221,8 +229,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
             set({
               board: aiBoard,
-              currentPlayer: 1, // 下一回合轮到玩家(黑棋)
-              winner: aiWon ? aiPlayerNumber : 0,
+              currentPlayer: aiFirst ? 2 : 1, // 下一回合轮到对方玩家
+              winner: aiWon ? currentAIPlayer : 0,
               gameOver: aiWon,
               isAIThinking: false,
               moveHistory: updatedHistory,
@@ -325,6 +333,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameOver: false,
       isAIThinking: false,
       moveHistory: [], // 重置落子历史
+      aiFirst: false, // 重置AI先手设置，默认玩家先手
     });
 
     // 如果切换到弈心模式，确保引擎已初始化
@@ -367,6 +376,42 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       return { advancedAIConfig: config };
     });
+  },
+
+  setAIFirst: (aiFirst: boolean) => {
+    set({ aiFirst });
+
+    // 如果是AI模式，重新开始游戏以应用新的先手设置
+    const { gameMode } = get();
+    if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced') {
+      set({
+        board: createEmptyBoard(),
+        currentPlayer: 1, // 总是从黑棋开始
+        winner: 0,
+        gameOver: false,
+        isAIThinking: false,
+        moveHistory: [],
+      });
+
+      // 如果AI先手，立即让AI下第一步（黑棋）
+      if (aiFirst) {
+        setTimeout(() => {
+          const state = get();
+          set({ isAIThinking: true });
+
+          // 模拟AI在天元落第一子
+          const newBoard = state.board.map(row => [...row]);
+          newBoard[7][7] = 1; // AI下黑棋在天元
+
+          set({
+            board: newBoard,
+            currentPlayer: 2, // 下一回合轮到玩家（白棋）
+            moveHistory: [[7, 7]],
+            isAIThinking: false,
+          });
+        }, 100);
+      }
+    }
   },
 
   checkWin,

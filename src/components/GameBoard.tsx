@@ -44,6 +44,8 @@ export const GameBoard: React.FC = () => {
   const setGameMode = useGameStore(state => state.setGameMode);
   const undoMove = useGameStore(state => state.undoMove);
   const moveHistory = useGameStore(state => state.moveHistory);
+  const aiFirst = useGameStore(state => state.aiFirst);
+  const setAIFirst = useGameStore(state => state.setAIFirst);
 
   // 获取主题装饰角颜色
   const getThemeCornerColor = useCallback((theme: any) => {
@@ -93,9 +95,17 @@ export const GameBoard: React.FC = () => {
     if (!previewPosition || 
         state.gameOver || 
         state.isAIThinking || 
-        state.board[previewPosition.row][previewPosition.col] !== 0 ||
-        ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1)) {
+        state.board[previewPosition.row][previewPosition.col] !== 0) {
       return;
+    }
+    
+    // 检查是否轮到玩家
+    const isAIMode = state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced';
+    if (isAIMode) {
+      const playerNumber = state.aiFirst ? 2 : 1; // AI先手时玩家是白棋(2)，否则是黑棋(1)
+      if (state.currentPlayer !== playerNumber) {
+        return;
+      }
     }
     
     // 创建并添加预览棋子
@@ -336,9 +346,14 @@ export const GameBoard: React.FC = () => {
           return;
         }
         
-        if ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1) {
-          setPreviewPosition(null);
-          return;
+        // 检查是否轮到玩家
+        const isAIMode = state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced';
+        if (isAIMode) {
+          const playerNumber = state.aiFirst ? 2 : 1; // AI先手时玩家是白棋(2)，否则是黑棋(1)
+          if (state.currentPlayer !== playerNumber) {
+            setPreviewPosition(null);
+            return;
+          }
         }
 
         const pos = event.data.getLocalPosition(app.stage);
@@ -381,7 +396,12 @@ export const GameBoard: React.FC = () => {
         const state = useGameStore.getState();
         if (state.gameOver || state.isAIThinking) return;
         
-        if ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1) return;
+        // 检查是否轮到玩家
+        const isAIMode = state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced';
+        if (isAIMode) {
+          const playerNumber = state.aiFirst ? 2 : 1; // AI先手时玩家是白棋(2)，否则是黑棋(1)
+          if (state.currentPlayer !== playerNumber) return;
+        }
 
         const pos = event.data.getLocalPosition(app.stage);
         const boardX = pos.x - BOARD_PADDING;
@@ -840,9 +860,9 @@ export const GameBoard: React.FC = () => {
           </div>
         )}
         
-        {/* 游戏模式选择 */}
+      {/* 游戏模式选择 */}
       <div className={`${currentTheme.uiBackgroundClass} rounded-xl shadow-lg p-3 border-2 text-sm`}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className={`font-semibold ${currentTheme.textColorClass}`}>模式:</span>
           <button
             onClick={() => {
@@ -909,6 +929,40 @@ export const GameBoard: React.FC = () => {
           >
             高级AI
           </button>
+          
+          {/* AI先手选择 - 只在AI模式下显示 */}
+          {(gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced') && (
+            <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-300">
+              <span className={`text-xs ${currentTheme.textColorClass}`}>先手:</span>
+              <button
+                onClick={() => {
+                  setAIFirst(false);
+                  audioService.playSound('click');
+                }}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                  !aiFirst 
+                    ? 'bg-green-500 text-white shadow-sm' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                玩家
+              </button>
+              <button
+                onClick={() => {
+                  setAIFirst(true);
+                  audioService.playSound('click');
+                }}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                  aiFirst 
+                    ? 'bg-red-500 text-white shadow-sm' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                AI
+              </button>
+            </div>
+          )}
+          
           {gameMode === 'ai' && (
             <button
               onClick={() => {
@@ -970,10 +1024,12 @@ export const GameBoard: React.FC = () => {
                 }`}></div>
                 <span className="text-sm font-medium text-gray-700">
                   {gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced' ? 
-                    (currentPlayer === 1 ? '玩家' : 
-                      gameMode === 'llm' ? '大模型' : 
-                      gameMode === 'yixin' ? '弈心' : 
-                      gameMode === 'advanced' ? '高级AI' : 'AI') : 
+                    (aiFirst ? 
+                      (currentPlayer === 1 ? 'AI' : '玩家') : 
+                      (currentPlayer === 1 ? '玩家' : 
+                        gameMode === 'llm' ? '大模型' : 
+                        gameMode === 'yixin' ? '弈心' : 
+                        gameMode === 'advanced' ? '高级AI' : 'AI')) : 
                     (currentPlayer === 1 ? '黑棋' : '白棋')
                   }
                 </span>
@@ -1066,13 +1122,13 @@ export const GameBoard: React.FC = () => {
       <div className="text-center text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
         <p className="text-xs font-medium">
           {gameMode === 'ai' ? 
-            '💡 您执黑棋，点击交叉点落子' : 
+            (aiFirst ? '💡 AI执黑棋先手，您执白棋' : '💡 您执黑棋先手，点击交叉点落子') : 
             gameMode === 'llm' ?
-            '💡 您执黑棋，与大模型对战' :
+            (aiFirst ? '💡 AI执黑棋先手，您执白棋与大模型对战' : '💡 您执黑棋先手，与大模型对战') :
             gameMode === 'yixin' ?
-            '💡 您执黑棋，与弈心引擎对战' :
+            (aiFirst ? '💡 弈心执黑棋先手，您执白棋' : '💡 您执黑棋先手，与弈心引擎对战') :
             gameMode === 'advanced' ?
-            '💡 您执黑棋，与高级AI对战' :
+            (aiFirst ? '💡 高级AI执黑棋先手，您执白棋' : '💡 您执黑棋先手，与高级AI对战') :
             '💡 点击交叉点落子'
           }
         </p>
