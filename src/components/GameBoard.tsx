@@ -871,7 +871,7 @@ export const GameBoard: React.FC = () => {
               setGameMode('human');
               audioService.playSound('click');
             }}
-            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm cursor-pointer ${
               gameMode === 'human' 
                 ? 'bg-amber-500 text-white shadow-md' 
                 : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
@@ -884,7 +884,7 @@ export const GameBoard: React.FC = () => {
               setGameMode('ai');
               audioService.playSound('click');
             }}
-            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm cursor-pointer ${
               gameMode === 'ai' 
                 ? 'bg-amber-500 text-white shadow-md' 
                 : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
@@ -897,7 +897,7 @@ export const GameBoard: React.FC = () => {
               setGameMode('llm');
               audioService.playSound('click');
             }}
-            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm cursor-pointer ${
               gameMode === 'llm' 
                 ? 'bg-blue-500 text-white shadow-md' 
                 : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
@@ -910,7 +910,7 @@ export const GameBoard: React.FC = () => {
               setGameMode('yixin');
               audioService.playSound('click');
             }}
-            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm cursor-pointer ${
               gameMode === 'yixin' 
                 ? 'bg-purple-500 text-white shadow-md' 
                 : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
@@ -923,7 +923,7 @@ export const GameBoard: React.FC = () => {
               setGameMode('advanced');
               audioService.playSound('click');
             }}
-            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm cursor-pointer ${
               gameMode === 'advanced' 
                 ? 'bg-emerald-500 text-white shadow-md' 
                 : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
@@ -941,7 +941,7 @@ export const GameBoard: React.FC = () => {
                   setAIFirst(false);
                   audioService.playSound('click');
                 }}
-                className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                className={`px-2 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                   !aiFirst 
                     ? 'bg-green-500 text-white shadow-sm' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -954,7 +954,7 @@ export const GameBoard: React.FC = () => {
                   setAIFirst(true);
                   audioService.playSound('click');
                 }}
-                className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                className={`px-2 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                   aiFirst 
                     ? 'bg-red-500 text-white shadow-sm' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -971,7 +971,7 @@ export const GameBoard: React.FC = () => {
                 setShowAISettings(true);
                 audioService.playSound('click');
               }}
-              className="px-2 py-1 bg-amber-200 text-amber-800 rounded-md hover:bg-amber-300 transition-colors text-sm"
+              className="px-2 py-1 bg-amber-200 text-amber-800 rounded-md hover:bg-amber-300 transition-colors text-sm cursor-pointer"
               title="AI设置"
             >
               ⚙️
@@ -983,7 +983,7 @@ export const GameBoard: React.FC = () => {
                 setShowLLMSettings(true);
                 audioService.playSound('click');
               }}
-              className="px-2 py-1 bg-blue-200 text-blue-800 rounded-md hover:bg-blue-300 transition-colors text-sm"
+              className="px-2 py-1 bg-blue-200 text-blue-800 rounded-md hover:bg-blue-300 transition-colors text-sm cursor-pointer"
               title="大模型设置"
             >
               ⚙️
