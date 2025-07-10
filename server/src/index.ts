@@ -21,6 +21,33 @@ app.use(express.json());
 // YiXin AI 路由
 app.use("/api/yixin", yiXinRouter);
 
+// 高级AI路由 - 临时用于测试
+app.post("/api/advanced-ai-move", async (req, res) => {
+  try {
+    const { board, currentPlayer } = req.body;
+    console.log("收到高级AI请求，当前玩家:", currentPlayer);
+
+    // 简单模拟AI逻辑 - 找第一个空位
+    let found = false;
+    for (let row = 0; row < 15 && !found; row++) {
+      for (let col = 0; col < 15 && !found; col++) {
+        if (board[row][col] === 0) {
+          console.log(`AI选择位置: [${row}, ${col}]`);
+          res.json({ row, col, confidence: 85 });
+          found = true;
+        }
+      }
+    }
+
+    if (!found) {
+      res.status(400).json({ error: "棋盘已满" });
+    }
+  } catch (error) {
+    console.error("高级AI API错误:", error);
+    res.status(500).json({ error: "服务器内部错误" });
+  }
+});
+
 // 创建Socket.IO服务器
 const io = new Server(server, {
   cors: {

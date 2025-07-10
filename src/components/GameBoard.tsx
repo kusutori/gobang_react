@@ -30,7 +30,16 @@ export const GameBoard: React.FC = () => {
   const [canvasHeight, setCanvasHeight] = useState(0);
   const [pixiError, setPixiError] = useState<string | null>(null);
   
-  const { board, currentPlayer, winner, gameOver, gameMode, isAIThinking, makeMove, resetGame, setGameMode } = useGameStore();
+  // 使用更精确的状态订阅，避免不必要的重新渲染
+  const board = useGameStore(state => state.board);
+  const currentPlayer = useGameStore(state => state.currentPlayer);
+  const winner = useGameStore(state => state.winner);
+  const gameOver = useGameStore(state => state.gameOver);
+  const gameMode = useGameStore(state => state.gameMode);
+  const isAIThinking = useGameStore(state => state.isAIThinking);
+  const makeMove = useGameStore(state => state.makeMove);
+  const resetGame = useGameStore(state => state.resetGame);
+  const setGameMode = useGameStore(state => state.setGameMode);
 
   // 获取主题装饰角颜色
   const getThemeCornerColor = useCallback((theme: any) => {
@@ -158,10 +167,26 @@ export const GameBoard: React.FC = () => {
 
   // 初始化PixiJS应用
   const initializePixiApp = useCallback(async () => {
-    if (!canvasRef.current || canvasWidth === 0 || canvasHeight === 0) return;
+    if (!canvasRef.current || canvasWidth === 0 || canvasHeight === 0) {
+      console.log('PixiJS initialization skipped:', { 
+        hasCanvas: !!canvasRef.current, 
+        canvasWidth, 
+        canvasHeight 
+      });
+      return;
+    }
 
     try {
       setPixiError(null); // 清除之前的错误
+      
+      // 确保DOM元素完全可用
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      // 再次检查canvas引用是否有效
+      if (!canvasRef.current) {
+        console.warn('Canvas ref became null during initialization');
+        return;
+      }
       
       const app = new PIXI.Application();
       
@@ -175,6 +200,13 @@ export const GameBoard: React.FC = () => {
         powerPreference: 'high-performance',
         preserveDrawingBuffer: true,
       });
+
+      // 再次检查canvas引用
+      if (!canvasRef.current) {
+        console.warn('Canvas ref became null after app init');
+        app.destroy();
+        return;
+      }
 
       appRef.current = app;
       
@@ -211,14 +243,21 @@ export const GameBoard: React.FC = () => {
         return originalDestroy.apply(this, args);
       };
 
-      canvasRef.current.appendChild(app.canvas);
-
-      // 设置canvas样式
-      app.canvas.style.width = `${canvasWidth}px`;
-      app.canvas.style.height = `${canvasHeight}px`;
-      app.canvas.style.display = 'block';
-      app.canvas.style.maxWidth = '100%';
-      app.canvas.style.maxHeight = '100%';
+      // 最后检查一次canvas引用再添加到DOM
+      if (canvasRef.current) {
+        canvasRef.current.appendChild(app.canvas);
+        
+        // 设置canvas样式
+        app.canvas.style.width = `${canvasWidth}px`;
+        app.canvas.style.height = `${canvasHeight}px`;
+        app.canvas.style.display = 'block';
+        app.canvas.style.maxWidth = '100%';
+        app.canvas.style.maxHeight = '100%';
+      } else {
+        console.warn('Canvas ref is null when trying to append canvas');
+        app.destroy();
+        return;
+      }
 
       // 创建棋盘容器
       const boardContainer = new PIXI.Container();
@@ -235,9 +274,10 @@ export const GameBoard: React.FC = () => {
       // 添加点击事件
       app.stage.interactive = true;
       app.stage.on('pointerdown', (event: any) => {
-        if (gameOver || isAIThinking) return;
+        const state = useGameStore.getState();
+        if (state.gameOver || state.isAIThinking) return;
         
-        if ((gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin') && currentPlayer !== 1) return;
+        if ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1) return;
 
         const pos = event.data.getLocalPosition(app.stage);
         const boardX = pos.x - BOARD_PADDING;
@@ -261,7 +301,7 @@ export const GameBoard: React.FC = () => {
         // 检查是否在容错范围内
         if (colDistance <= tolerance && rowDistance <= tolerance && 
             row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-          const success = makeMove(row, col);
+          const success = state.makeMove(row, col);
           if (success) {
             audioService.playSound('place_stone');
           } else {
@@ -273,28 +313,11 @@ export const GameBoard: React.FC = () => {
       // 绘制棋盘
       redrawBoard();
       
-      // 重新绘制棋子
-      if (stonesContainerRef.current) {
-        stonesContainerRef.current.removeChildren();
-        for (let row = 0; row < BOARD_SIZE; row++) {
-          for (let col = 0; col < BOARD_SIZE; col++) {
-            const cell = board[row][col];
-            if (cell !== 0) {
-              const graphics = drawStone(col, row, cell);
-              // 添加位置标记方便后续查找
-              (graphics as any).row = row;
-              (graphics as any).col = col;
-              stonesContainerRef.current.addChild(graphics);
-            }
-          }
-        }
-      }
-      
     } catch (error) {
       console.error('Failed to initialize PixiJS:', error);
       setPixiError(error instanceof Error ? error.message : '初始化PixiJS失败');
     }
-  }, [canvasWidth, canvasHeight, currentTheme, gameOver, isAIThinking, gameMode, currentPlayer, makeMove, boardWidth, boardHeight, cellSize, board, redrawBoard]);
+  }, [canvasWidth, canvasHeight, currentTheme.backgroundColor, redrawBoard]);
 
   // 销毁PixiJS应用的函数
   const destroyPixiApp = useCallback(() => {
@@ -329,12 +352,22 @@ export const GameBoard: React.FC = () => {
 
   // 统一的PixiJS应用生命周期管理
   useEffect(() => {
-    // 初始化条件：尺寸有效且应用不存在
-    if (canvasWidth > 0 && canvasHeight > 0 && !appRef.current) {
-      initializePixiApp();
+    let timeoutId: NodeJS.Timeout;
+    
+    // 初始化条件：尺寸有效且应用不存在且canvas引用存在
+    if (canvasWidth > 0 && canvasHeight > 0 && !appRef.current && canvasRef.current) {
+      // 延迟初始化，确保DOM完全准备好
+      timeoutId = setTimeout(() => {
+        if (canvasRef.current && !appRef.current) {
+          initializePixiApp();
+        }
+      }, 50);
     }
 
     return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       destroyPixiApp();
     };
   }, [canvasWidth, canvasHeight, initializePixiApp, destroyPixiApp]);
@@ -407,13 +440,53 @@ export const GameBoard: React.FC = () => {
     boardContainerRef.current.addChild(graphics);
   }, [cellSize, boardHeight, boardWidth, currentTheme.gridColor, currentTheme.starColor]);
 
-  // 更新棋子显示 - 使用缓存优化性能
+  // 绘制棋子的函数 - 移到useEffect之前以解决依赖问题
+  const drawStone = useCallback((col: number, row: number, type: number, cellSizeParam?: number) => {
+    const size = cellSizeParam || cellSize;
+    const graphics = new PIXI.Graphics();
+    const radius = size / 2 - 2;
+    
+    if (type === 1) {
+      // 黑棋
+      graphics.beginFill(0x1a1a1a);
+      graphics.drawCircle(col * size, row * size, radius);
+      graphics.endFill();
+      graphics.beginFill(0x404040, 0.6);
+      graphics.drawCircle(col * size - radius/3, row * size - radius/3, radius/4);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, size / 32), 0x000000, 0.8);
+      graphics.drawCircle(col * size, row * size, radius);
+    } else {
+      // 白棋
+      graphics.beginFill(0xffffff);
+      graphics.drawCircle(col * size, row * size, radius);
+      graphics.endFill();
+      graphics.beginFill(0xe0e0e0, 0.4);
+      graphics.drawCircle(col * size + radius/4, row * size + radius/4, radius/3);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, size / 32), 0x666666, 0.8);
+      graphics.drawCircle(col * size, row * size, radius);
+    }
+    
+    return graphics;
+  }, [cellSize]);
+
+  // 更新棋子显示 - 使用缓存优化性能，移除可能导致循环的依赖
   const lastBoardRef = useRef<number[][]>([]);
+  const lastCellSizeRef = useRef<number>(0);
   
   useEffect(() => {
     if (!stonesContainerRef.current) return;
     
-    // 第一次渲染时绘制所有棋子
+    // 检查cellSize是否变化，如果变化则需要重新渲染所有棋子
+    const cellSizeChanged = lastCellSizeRef.current !== cellSize;
+    if (cellSizeChanged) {
+      lastCellSizeRef.current = cellSize;
+      // 清空缓存，强制重新渲染所有棋子
+      lastBoardRef.current = [];
+    }
+    
+    // 第一次渲染或cellSize变化时绘制所有棋子
     if (lastBoardRef.current.length === 0) {
       for (let row = 0; row < BOARD_SIZE; row++) {
         lastBoardRef.current[row] = [];
@@ -430,7 +503,32 @@ export const GameBoard: React.FC = () => {
         for (let col = 0; col < BOARD_SIZE; col++) {
           const cell = board[row][col];
           if (cell !== 0) {
-            const graphics = drawStone(col, row, cell);
+            // 直接创建棋子图形，避免依赖drawStone函数
+            const graphics = new PIXI.Graphics();
+            const radius = cellSize / 2 - 2;
+            
+            if (cell === 1) {
+              // 黑棋
+              graphics.beginFill(0x1a1a1a);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              graphics.endFill();
+              graphics.beginFill(0x404040, 0.6);
+              graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
+              graphics.endFill();
+              graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            } else {
+              // 白棋
+              graphics.beginFill(0xffffff);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              graphics.endFill();
+              graphics.beginFill(0xe0e0e0, 0.4);
+              graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
+              graphics.endFill();
+              graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            }
+            
             // 添加位置标记方便后续查找
             (graphics as any).row = row;
             (graphics as any).col = col;
@@ -440,7 +538,9 @@ export const GameBoard: React.FC = () => {
         }
       }
       return;
-    }      // 后续渲染只更新变化的部分
+    }
+    
+    // 后续渲染只更新变化的部分
     for (let row = 0; row < BOARD_SIZE; row++) {
       for (let col = 0; col < BOARD_SIZE; col++) {
         const newValue = board[row][col];
@@ -462,7 +562,31 @@ export const GameBoard: React.FC = () => {
           
           // 如果新状态不为空，则添加新棋子
           if (newValue !== 0) {
-            const graphics = drawStone(col, row, newValue);
+            // 直接创建棋子图形，避免依赖drawStone函数
+            const graphics = new PIXI.Graphics();
+            const radius = cellSize / 2 - 2;
+            
+            if (newValue === 1) {
+              // 黑棋
+              graphics.beginFill(0x1a1a1a);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              graphics.endFill();
+              graphics.beginFill(0x404040, 0.6);
+              graphics.drawCircle(col * cellSize - radius/3, row * cellSize - radius/3, radius/4);
+              graphics.endFill();
+              graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.8);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            } else {
+              // 白棋
+              graphics.beginFill(0xffffff);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+              graphics.endFill();
+              graphics.beginFill(0xe0e0e0, 0.4);
+              graphics.drawCircle(col * cellSize + radius/4, row * cellSize + radius/4, radius/3);
+              graphics.endFill();
+              graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.8);
+              graphics.drawCircle(col * cellSize, row * cellSize, radius);
+            }
             
             // 添加位置标记方便后续查找
             (graphics as any).row = row;
@@ -501,37 +625,6 @@ export const GameBoard: React.FC = () => {
     }
   }, [board, cellSize]);
   
-  // 绘制棋子的函数 - 在useEffect之前定义以解决循环依赖
-  const drawStone = (col: number, row: number, type: number, cellSizeParam?: number) => {
-    const size = cellSizeParam || cellSize;
-    const graphics = new PIXI.Graphics();
-    const radius = size / 2 - 2;
-    
-    if (type === 1) {
-      // 黑棋
-      graphics.beginFill(0x1a1a1a);
-      graphics.drawCircle(col * size, row * size, radius);
-      graphics.endFill();
-      graphics.beginFill(0x404040, 0.6);
-      graphics.drawCircle(col * size - radius/3, row * size - radius/3, radius/4);
-      graphics.endFill();
-      graphics.lineStyle(Math.max(1, size / 32), 0x000000, 0.8);
-      graphics.drawCircle(col * size, row * size, radius);
-    } else {
-      // 白棋
-      graphics.beginFill(0xffffff);
-      graphics.drawCircle(col * size, row * size, radius);
-      graphics.endFill();
-      graphics.beginFill(0xe0e0e0, 0.4);
-      graphics.drawCircle(col * size + radius/4, row * size + radius/4, radius/3);
-      graphics.endFill();
-      graphics.lineStyle(Math.max(1, size / 32), 0x666666, 0.8);
-      graphics.drawCircle(col * size, row * size, radius);
-    }
-    
-    return graphics;
-  };
-
   // 检查游戏结果并播放音效
   useEffect(() => {
     if (gameOver) {
@@ -568,6 +661,44 @@ export const GameBoard: React.FC = () => {
       }
     }
   }, [gameOver, winner, gameMode]);
+
+  // 简化的状态监控，避免无限循环
+  const prevStateRef = useRef({ 
+    boardHash: '', 
+    currentPlayer: 1, 
+    isAIThinking: false, 
+    gameMode: 'human' 
+  });
+  
+  useEffect(() => {
+    // 使用board的哈希值来检测真正的变化
+    const boardHash = board.flat().join(',');
+    const prev = prevStateRef.current;
+    
+    // 只在状态真正变化时才打印日志
+    if (prev.boardHash !== boardHash || 
+        prev.currentPlayer !== currentPlayer || 
+        prev.isAIThinking !== isAIThinking || 
+        prev.gameMode !== gameMode) {
+      
+      const nonEmptyCount = board.flat().filter(cell => cell !== 0).length;
+      console.log(`🎯 棋盘状态更新 - 总棋子数: ${nonEmptyCount}, 当前玩家: ${currentPlayer}, AI思考中: ${isAIThinking}, 游戏模式: ${gameMode}`);
+      
+      // 更新引用
+      prevStateRef.current = { boardHash, currentPlayer, isAIThinking, gameMode };
+    }
+  }, [board, currentPlayer, isAIThinking, gameMode]);
+
+  // 简化的AI思考状态监控，避免无限循环
+  const aiThinkingRef = useRef({ isAIThinking: false, gameMode: 'human' });
+  
+  useEffect(() => {
+    const prev = aiThinkingRef.current;
+    if (gameMode === 'advanced' && (prev.isAIThinking !== isAIThinking || prev.gameMode !== gameMode)) {
+      console.log(`🤖 AI思考状态: ${isAIThinking}`);
+      aiThinkingRef.current = { isAIThinking, gameMode };
+    }
+  }, [isAIThinking, gameMode]);
 
 
 
@@ -761,7 +892,7 @@ export const GameBoard: React.FC = () => {
             isAIThinking ? 'opacity-75 cursor-wait' : ''
           }`}
           style={{ 
-            width: `${canvasWidth}px`, 
+            width: `${canvasWidth}px`,
             height: `${canvasHeight}px`,
             maxWidth: '100%',
             maxHeight: '100%'

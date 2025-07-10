@@ -1,0 +1,179 @@
+// 创建一个简单的HTML页面来测试UI更新
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>高级AI测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            gap: 1px;
+            margin: 20px 0;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .cell.black {
+            background: black;
+            color: white;
+        }
+
+        .cell.white {
+            background: white;
+            color: black;
+            border: 2px solid black;
+        }
+
+        .status {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>高级AI测试 - 简化版本</h1>
+
+    <div class="status" id="status">当前玩家: 黑棋 (1)</div>
+
+    <button onclick="resetGame()">重置游戏</button>
+    <button onclick="testAIMove()">测试AI落子</button>
+
+    <div class="board" id="board"></div>
+
+    <div id="log"></div>
+
+    <script type="module">
+        // 简化的游戏状态
+        let board = Array(15).fill(null).map(() => Array(15).fill(0));
+        let currentPlayer = 1;
+        let isAIThinking = false;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+            console.log(message);
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('status');
+            status.textContent = isAIThinking ?
+                'AI思考中...' :
+                `当前玩家: ${currentPlayer === 1 ? '黑棋' : '白棋'} (${currentPlayer})`;
+        }
+
+        function renderBoard() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+
+            for (let row = 0; row < 15; row++) {
+                for (let col = 0; col < 15; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.onclick = () => makeMove(row, col);
+
+                    if (board[row][col] === 1) {
+                        cell.classList.add('black');
+                        cell.textContent = '●';
+                    } else if (board[row][col] === 2) {
+                        cell.classList.add('white');
+                        cell.textContent = '○';
+                    }
+
+                    boardDiv.appendChild(cell);
+                }
+            }
+        }
+
+        async function makeMove(row, col) {
+            if (board[row][col] !== 0 || isAIThinking) {
+                return false;
+            }
+
+            log(`玩家落子: [${row}, ${col}]`);
+            board[row][col] = currentPlayer;
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+
+            renderBoard();
+            updateStatus();
+
+            // 如果轮到AI (玩家2)
+            if (currentPlayer === 2) {
+                isAIThinking = true;
+                updateStatus();
+
+                try {
+                    log('开始调用AI...');
+                    const response = await fetch('/api/advanced-ai-move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ board, currentPlayer: 2 })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('AI API调用失败');
+                    }
+
+                    const result = await response.json();
+                    log(`AI返回: [${result.row}, ${result.col}]`);
+
+                    board[result.row][result.col] = 2;
+                    currentPlayer = 1;
+
+                    renderBoard();
+                    log('AI落子完成');
+
+                } catch (error) {
+                    log('AI调用失败: ' + error.message);
+                } finally {
+                    isAIThinking = false;
+                    updateStatus();
+                }
+            }
+
+            return true;
+        }
+
+        function resetGame() {
+            board = Array(15).fill(null).map(() => Array(15).fill(0));
+            currentPlayer = 1;
+            isAIThinking = false;
+            renderBoard();
+            updateStatus();
+            log('游戏重置');
+        }
+
+        async function testAIMove() {
+            // 手动放置一个棋子然后测试AI
+            if (board[7][7] === 0) {
+                await makeMove(7, 7);
+            }
+        }
+
+        // 初始化
+        renderBoard();
+        updateStatus();
+        log('游戏初始化完成');
+    </script>
+</body>
+
+</html>

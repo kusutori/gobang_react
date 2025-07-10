@@ -113,14 +113,17 @@ export class AdvancedAI {
       // For now, run synchronously since setting up Web Workers in Bun might be complex
       // In a real implementation, this would be in a Web Worker
       try {
+        console.log("高级AI开始计算，深度:", depth);
         const move = this.minimax.getBestMove(board, 1, depth);
         const stats = this.minimax.getCacheStats();
 
         if (!move) {
+          console.error("高级AI无法找到有效落子");
           reject(new Error("No valid move found"));
           return;
         }
 
+        console.log("高级AI计算完成，落子位置:", move);
         resolve({
           row: move[0],
           col: move[1],
@@ -129,6 +132,7 @@ export class AdvancedAI {
           nodesSearched: stats.hits.search,
         });
       } catch (error) {
+        console.error("高级AI计算错误:", error);
         reject(error);
       }
     });
