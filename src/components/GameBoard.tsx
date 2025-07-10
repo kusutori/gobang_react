@@ -19,6 +19,7 @@ export const GameBoard: React.FC = () => {
   const appRef = useRef<PIXI.Application | null>(null);
   const boardContainerRef = useRef<PIXI.Container | null>(null);
   const stonesContainerRef = useRef<PIXI.Container | null>(null);
+  const previewStoneContainerRef = useRef<PIXI.Container | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showLLMSettings, setShowLLMSettings] = useState(false);
   const [showAdvancedAISettings, setShowAdvancedAISettings] = useState(false);
@@ -29,6 +30,7 @@ export const GameBoard: React.FC = () => {
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [canvasHeight, setCanvasHeight] = useState(0);
   const [pixiError, setPixiError] = useState<string | null>(null);
+  const [previewPosition, setPreviewPosition] = useState<{row: number, col: number} | null>(null);
   
   // 使用更精确的状态订阅，避免不必要的重新渲染
   const board = useGameStore(state => state.board);
@@ -52,6 +54,52 @@ export const GameBoard: React.FC = () => {
       default: return 'bg-amber-800';
     }
   }, []);
+
+  // 创建预览棋子
+  const createPreviewStone = useCallback((col: number, row: number, type: number) => {
+    const graphics = new PIXI.Graphics();
+    const radius = cellSize / 2 - 2;
+    
+    if (type === 1) {
+      // 黑棋预览 - 更透明
+      graphics.beginFill(0x1a1a1a, 0.4);
+      graphics.drawCircle(col * cellSize, row * cellSize, radius);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, cellSize / 32), 0x000000, 0.6);
+      graphics.drawCircle(col * cellSize, row * cellSize, radius);
+    } else {
+      // 白棋预览 - 更透明
+      graphics.beginFill(0xffffff, 0.4);
+      graphics.drawCircle(col * cellSize, row * cellSize, radius);
+      graphics.endFill();
+      graphics.lineStyle(Math.max(1, cellSize / 32), 0x666666, 0.6);
+      graphics.drawCircle(col * cellSize, row * cellSize, radius);
+    }
+    
+    return graphics;
+  }, [cellSize]);
+
+  // 更新预览棋子
+  const updatePreviewStone = useCallback(() => {
+    if (!previewStoneContainerRef.current) return;
+    
+    // 清除现有预览棋子
+    previewStoneContainerRef.current.removeChildren();
+    
+    // 检查是否应该显示预览棋子
+    const state = useGameStore.getState();
+    if (!previewPosition || 
+        state.gameOver || 
+        state.isAIThinking || 
+        state.board[previewPosition.row][previewPosition.col] !== 0 ||
+        ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1)) {
+      return;
+    }
+    
+    // 创建并添加预览棋子
+    const previewStone = createPreviewStone(previewPosition.col, previewPosition.row, state.currentPlayer);
+    previewStoneContainerRef.current.addChild(previewStone);
+  }, [previewPosition, createPreviewStone]);
 
   // 计算棋盘尺寸
   const calculateBoardSize = useCallback(() => {
@@ -271,8 +319,62 @@ export const GameBoard: React.FC = () => {
       stonesContainerRef.current = stonesContainer;
       app.stage.addChild(stonesContainer);
 
-      // 添加点击事件
+      // 创建预览棋子容器
+      const previewStoneContainer = new PIXI.Container();
+      previewStoneContainer.position.set(BOARD_PADDING, BOARD_PADDING);
+      previewStoneContainerRef.current = previewStoneContainer;
+      app.stage.addChild(previewStoneContainer);
+
+      // 添加鼠标移动事件
       app.stage.interactive = true;
+      app.stage.on('pointermove', (event: any) => {
+        const state = useGameStore.getState();
+        if (state.gameOver || state.isAIThinking) {
+          setPreviewPosition(null);
+          return;
+        }
+        
+        if ((state.gameMode === 'ai' || state.gameMode === 'llm' || state.gameMode === 'yixin' || state.gameMode === 'advanced') && state.currentPlayer !== 1) {
+          setPreviewPosition(null);
+          return;
+        }
+
+        const pos = event.data.getLocalPosition(app.stage);
+        const boardX = pos.x - BOARD_PADDING;
+        const boardY = pos.y - BOARD_PADDING;
+        
+        if (boardX < 0 || boardX > boardWidth || boardY < 0 || boardY > boardHeight) {
+          setPreviewPosition(null);
+          return;
+        }
+        
+        // 计算最近的交叉点
+        const exactCol = boardX / cellSize;
+        const exactRow = boardY / cellSize;
+        const col = Math.round(exactCol);
+        const row = Math.round(exactRow);
+        
+        // 增加判定容错范围 - 进一步提高到0.6，让操作更流畅
+        const tolerance = 0.6;
+        const colDistance = Math.abs(exactCol - col);
+        const rowDistance = Math.abs(exactRow - row);
+        
+        // 检查是否在容错范围内且位置有效
+        if (colDistance <= tolerance && rowDistance <= tolerance && 
+            row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE &&
+            state.board[row][col] === 0) {
+          setPreviewPosition({ row, col });
+        } else {
+          setPreviewPosition(null);
+        }
+      });
+
+      // 添加鼠标离开事件
+      app.stage.on('pointerleave', () => {
+        setPreviewPosition(null);
+      });
+
+      // 添加点击事件
       app.stage.on('pointerdown', (event: any) => {
         const state = useGameStore.getState();
         if (state.gameOver || state.isAIThinking) return;
@@ -293,8 +395,8 @@ export const GameBoard: React.FC = () => {
         const col = Math.round(exactCol);
         const row = Math.round(exactRow);
         
-        // 增加判定容错范围 - 允许点击距离交叉点一定范围内的区域
-        const tolerance = 0.35; // 容错范围，0.5表示半个格子的距离
+        // 增加判定容错范围 - 进一步提高到0.6，让操作更流畅
+        const tolerance = 0.6;
         const colDistance = Math.abs(exactCol - col);
         const rowDistance = Math.abs(exactRow - row);
         
@@ -304,6 +406,7 @@ export const GameBoard: React.FC = () => {
           const success = state.makeMove(row, col);
           if (success) {
             audioService.playSound('place_stone');
+            setPreviewPosition(null); // 落子成功后清除预览
           } else {
             audioService.playSound('error');
           }
@@ -332,6 +435,7 @@ export const GameBoard: React.FC = () => {
     
     boardContainerRef.current = null;
     stonesContainerRef.current = null;
+    previewStoneContainerRef.current = null;
     
     if (canvasRef.current) {
       canvasRef.current.innerHTML = '';
@@ -624,6 +728,11 @@ export const GameBoard: React.FC = () => {
       }
     }
   }, [board, cellSize]);
+  
+  // 更新预览棋子显示
+  useEffect(() => {
+    updatePreviewStone();
+  }, [previewPosition, currentPlayer, gameOver, isAIThinking, updatePreviewStone]);
   
   // 检查游戏结果并播放音效
   useEffect(() => {
