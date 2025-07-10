@@ -42,6 +42,7 @@ export interface GameState {
   setLLMConfig: (config: LLMConfig) => void;
   setAdvancedAIConfig: (config: AdvancedAIConfig) => void;
   checkWin: (board: Board, row: number, col: number) => boolean;
+  undoMove: () => boolean; // 新增：悔棋功能
 }
 
 // 创建空棋盘
@@ -247,6 +248,51 @@ export const useGameStore = create<GameState>((set, get) => ({
           }
         });
     }
+
+    return true;
+  },
+
+  undoMove: () => {
+    const { moveHistory, gameMode, isAIThinking, gameOver } = get();
+
+    // 如果AI正在思考或游戏已结束，不允许悔棋
+    if (isAIThinking) {
+      return false;
+    }
+
+    // 计算需要撤销的步数
+    let stepsToUndo = 1;
+    if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced') {
+      // 在AI模式下，需要撤销玩家和AI的两步棋
+      stepsToUndo = Math.min(2, moveHistory.length);
+    }
+
+    // 检查是否有足够的历史记录可以撤销
+    if (moveHistory.length < stepsToUndo) {
+      return false;
+    }
+
+    // 创建新的棋盘和历史记录
+    const newBoard = createEmptyBoard();
+    const newMoveHistory = moveHistory.slice(0, -stepsToUndo);
+
+    // 重新应用剩余的落子历史
+    for (let i = 0; i < newMoveHistory.length; i++) {
+      const [row, col] = newMoveHistory[i];
+      const player = (i % 2) + 1; // 黑棋(1)和白棋(2)交替
+      newBoard[row][col] = player as CellState;
+    }
+
+    // 确定当前应该轮到哪个玩家
+    const newCurrentPlayer = (newMoveHistory.length % 2 + 1) as 1 | 2;
+
+    set({
+      board: newBoard,
+      currentPlayer: newCurrentPlayer,
+      winner: 0,
+      gameOver: false,
+      moveHistory: newMoveHistory,
+    });
 
     return true;
   },

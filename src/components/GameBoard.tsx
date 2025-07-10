@@ -42,6 +42,8 @@ export const GameBoard: React.FC = () => {
   const makeMove = useGameStore(state => state.makeMove);
   const resetGame = useGameStore(state => state.resetGame);
   const setGameMode = useGameStore(state => state.setGameMode);
+  const undoMove = useGameStore(state => state.undoMove);
+  const moveHistory = useGameStore(state => state.moveHistory);
 
   // 获取主题装饰角颜色
   const getThemeCornerColor = useCallback((theme: any) => {
@@ -979,17 +981,43 @@ export const GameBoard: React.FC = () => {
             )}
           </div>
           
-          <button
-            onClick={() => {
-              resetGame();
-              audioService.playSound('click');
-            }}
-            className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white 
-                     font-semibold rounded-lg shadow-md hover:from-amber-600 hover:to-orange-600 
-                     transform hover:scale-105 transition-all duration-200 active:scale-95 text-sm"
-          >
-            重新开始
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const success = undoMove();
+                if (success) {
+                  audioService.playSound('click');
+                } else {
+                  audioService.playSound('error');
+                }
+              }}
+              disabled={moveHistory.length === 0 || isAIThinking || gameOver}
+              className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white 
+                       font-semibold rounded-lg shadow-md hover:from-blue-600 hover:to-blue-700 
+                       transform hover:scale-105 transition-all duration-200 active:scale-95 text-sm
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              title={
+                moveHistory.length === 0 ? '没有可悔棋的步数' :
+                isAIThinking ? 'AI思考中，无法悔棋' :
+                gameOver ? '游戏已结束' :
+                '悔棋（撤销上一步）'
+              }
+            >
+              悔棋
+            </button>
+            
+            <button
+              onClick={() => {
+                resetGame();
+                audioService.playSound('click');
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white 
+                       font-semibold rounded-lg shadow-md hover:from-amber-600 hover:to-orange-600 
+                       transform hover:scale-105 transition-all duration-200 active:scale-95 text-sm"
+            >
+              重新开始
+            </button>
+          </div>
         </div>
       </div>
       
