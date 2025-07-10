@@ -245,10 +245,20 @@ export const GameBoard: React.FC = () => {
           return;
         }
         
-        const col = Math.round(boardX / cellSize);
-        const row = Math.round(boardY / cellSize);
-
-        if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+        // 计算最近的交叉点
+        const exactCol = boardX / cellSize;
+        const exactRow = boardY / cellSize;
+        const col = Math.round(exactCol);
+        const row = Math.round(exactRow);
+        
+        // 增加判定容错范围 - 允许点击距离交叉点一定范围内的区域
+        const tolerance = 0.35; // 容错范围，0.5表示半个格子的距离
+        const colDistance = Math.abs(exactCol - col);
+        const rowDistance = Math.abs(exactRow - row);
+        
+        // 检查是否在容错范围内
+        if (colDistance <= tolerance && rowDistance <= tolerance && 
+            row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
           const success = makeMove(row, col);
           if (success) {
             audioService.playSound('place_stone');
