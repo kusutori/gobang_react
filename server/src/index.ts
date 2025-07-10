@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { SocketHandler } from "./socket/SocketHandler.js";
+import { yiXinRouter } from "./yixin/yiXinRouter.js";
 
 const app = express();
 const server = createServer(app);
@@ -16,6 +17,9 @@ app.use(
 );
 
 app.use(express.json());
+
+// YiXin AI 路由
+app.use("/api/yixin", yiXinRouter);
 
 // 创建Socket.IO服务器
 const io = new Server(server, {

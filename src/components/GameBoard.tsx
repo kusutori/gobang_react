@@ -235,7 +235,7 @@ export const GameBoard: React.FC = () => {
       app.stage.on('pointerdown', (event: any) => {
         if (gameOver || isAIThinking) return;
         
-        if (gameMode === 'ai' && currentPlayer !== 1) return;
+        if ((gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin') && currentPlayer !== 1) return;
 
         const pos = event.data.getLocalPosition(app.stage);
         const boardX = pos.x - BOARD_PADDING;
@@ -539,13 +539,13 @@ export const GameBoard: React.FC = () => {
         audioService.playSound('win');
         
         // 更新统计数据
-        if (gameMode === 'ai' || gameMode === 'llm') {
-          // AI/LLM模式下，玩家是黑棋(1)
+        if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin') {
+          // AI/LLM/弈心模式下，玩家是黑棋(1)
           if (winner === 1) {
-            console.log('玩家击败' + (gameMode === 'llm' ? '大模型' : 'AI') + '，更新胜利统计');
+            console.log('玩家击败' + (gameMode === 'llm' ? '大模型' : gameMode === 'yixin' ? '弈心' : 'AI') + '，更新胜利统计');
             updateGameStats('win');
           } else {
-            console.log((gameMode === 'llm' ? '大模型' : 'AI') + '击败玩家，更新失败统计');
+            console.log((gameMode === 'llm' ? '大模型' : gameMode === 'yixin' ? '弈心' : 'AI') + '击败玩家，更新失败统计');
             updateGameStats('lose');
           }
         } else if (gameMode === 'human') {
@@ -633,6 +633,19 @@ export const GameBoard: React.FC = () => {
           >
             大模型
           </button>
+          <button
+            onClick={() => {
+              setGameMode('yixin');
+              audioService.playSound('click');
+            }}
+            className={`px-3 py-1 rounded-md font-medium transition-all text-sm ${
+              gameMode === 'yixin' 
+                ? 'bg-purple-500 text-white shadow-md' 
+                : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+            }`}
+          >
+            弈心
+          </button>
           {gameMode === 'ai' && (
             <button
               onClick={() => {
@@ -668,7 +681,7 @@ export const GameBoard: React.FC = () => {
               {gameOver ? (
                 winner === 1 ? '🎉 黑棋获胜' : winner === 2 ? '🎉 白棋获胜' : '平局'
               ) : isAIThinking ? (
-                '🤖 AI思考中'
+                '🤖 ' + (gameMode === 'yixin' ? '弈心' : gameMode === 'llm' ? 'AI' : 'AI') + '思考中'
               ) : (
                 `当前回合`
               )}
@@ -679,8 +692,10 @@ export const GameBoard: React.FC = () => {
                   currentPlayer === 1 ? 'bg-black border-gray-600' : 'bg-white border-gray-400'
                 }`}></div>
                 <span className="text-sm font-medium text-gray-700">
-                  {gameMode === 'ai' || gameMode === 'llm' ? 
-                    (currentPlayer === 1 ? '玩家' : gameMode === 'llm' ? '大模型' : 'AI') : 
+                  {gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' ? 
+                    (currentPlayer === 1 ? '玩家' : 
+                      gameMode === 'llm' ? '大模型' : 
+                      gameMode === 'yixin' ? '弈心' : 'AI') : 
                     (currentPlayer === 1 ? '黑棋' : '白棋')
                   }
                 </span>
@@ -750,6 +765,8 @@ export const GameBoard: React.FC = () => {
             '💡 您执黑棋，点击交叉点落子' : 
             gameMode === 'llm' ?
             '💡 您执黑棋，与大模型对战' :
+            gameMode === 'yixin' ?
+            '💡 您执黑棋，与弈心引擎对战' :
             '💡 点击交叉点落子'
           }
         </p>

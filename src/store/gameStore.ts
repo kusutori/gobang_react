@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { AIPlayer, createAIConfig } from "../game/ai/AIPlayer";
+import { yiXinService } from "../services/YiXinService";
 
 // 棋盘状态：0-空, 1-黑棋, 2-白棋
 export type CellState = 0 | 1 | 2;
 export type Board = CellState[][];
 
 // 游戏模式
-export type GameMode = "human" | "ai" | "llm";
+export type GameMode = "human" | "ai" | "llm" | "yixin";
 
 // LLM配置
 export interface LLMConfig {
@@ -29,6 +30,7 @@ export interface GameState {
   aiPlayer: AIPlayer | null;
   isAIThinking: boolean;
   llmConfig: LLMConfig | null;
+  moveHistory: Array<[number, number]>; // 新增：记录落子历史
 
   // 操作方法
   makeMove: (row: number, col: number) => boolean;
@@ -112,9 +114,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   aiPlayer: null,
   isAIThinking: false,
   llmConfig: null,
+  moveHistory: [], // 初始化落子历史
 
   makeMove: (row: number, col: number) => {
-    const { board, currentPlayer, gameOver, gameMode, aiPlayer, llmConfig } = get();
+    const {
+      board,
+      currentPlayer,
+      gameOver,
+      gameMode,
+      aiPlayer,
+      llmConfig,
+      moveHistory,
+    } = get();
 
     if (gameOver || board[row][col] !== 0) {
       return false;
@@ -124,44 +135,68 @@ export const useGameStore = create<GameState>((set, get) => ({
     newBoard[row][col] = currentPlayer;
 
     const hasWon = checkWin(newBoard, row, col);
+    const newMoveHistory = [...moveHistory, [row, col] as [number, number]];
 
     set({
       board: newBoard,
       currentPlayer: currentPlayer === 1 ? 2 : 1,
       winner: hasWon ? currentPlayer : 0,
       gameOver: hasWon,
+      moveHistory: newMoveHistory,
     });
 
-    // 如果是 AI 模式且轮到 AI，让 AI 下棋
+    // 如果是 AI/LLM/弈心 模式且轮到 AI，让 AI 下棋
     if (
-      (gameMode === "ai" || gameMode === "llm") &&
+      (gameMode === "ai" || gameMode === "llm" || gameMode === "yixin") &&
       !hasWon &&
-      aiPlayer &&
-      (currentPlayer === 1 ? 2 : 1) === aiPlayer.getConfig().player
+      (currentPlayer === 1 ? 2 : 1) === 2 // AI总是白棋(2)
     ) {
       set({ isAIThinking: true });
 
-      // 不同模式的 AI 行为
-      const aiMovePromise = gameMode === "llm" && llmConfig
-        ? aiPlayer.makeLLMMove(newBoard, llmConfig)
-        : aiPlayer.makeMove(newBoard);
+      let aiMovePromise: Promise<{ row: number; col: number; score?: number }>;
+
+      if (gameMode === "yixin") {
+        // 弈心模式：使用完整的落子历史
+        aiMovePromise = yiXinService.getMove(newMoveHistory);
+      } else if (gameMode === "llm" && llmConfig && aiPlayer) {
+        // LLM模式
+        aiMovePromise = aiPlayer.makeLLMMove(newBoard, llmConfig);
+      } else if (aiPlayer) {
+        // 传统AI模式
+        aiMovePromise = aiPlayer.makeMove(newBoard);
+      } else {
+        // 没有可用的AI，结束思考状态
+        set({ isAIThinking: false });
+        return true;
+      }
 
       aiMovePromise
         .then((aiMove) => {
-          const { board: currentBoard, gameOver: isGameOver } = get();
+          const {
+            board: currentBoard,
+            gameOver: isGameOver,
+            gameMode: currentMode,
+            moveHistory: currentHistory,
+          } = get();
 
           if (!isGameOver && currentBoard[aiMove.row][aiMove.col] === 0) {
             const aiBoard = currentBoard.map((row) => [...row]);
-            aiBoard[aiMove.row][aiMove.col] = aiPlayer.getConfig().player;
+            const aiPlayerNumber = 2; // AI总是白棋
+            aiBoard[aiMove.row][aiMove.col] = aiPlayerNumber;
 
             const aiWon = checkWin(aiBoard, aiMove.row, aiMove.col);
+            const updatedHistory = [
+              ...currentHistory,
+              [aiMove.row, aiMove.col] as [number, number],
+            ];
 
             set({
               board: aiBoard,
-              currentPlayer: aiPlayer.getConfig().player === 1 ? 2 : 1,
-              winner: aiWon ? aiPlayer.getConfig().player : 0,
+              currentPlayer: 1, // 下一回合轮到玩家(黑棋)
+              winner: aiWon ? aiPlayerNumber : 0,
               gameOver: aiWon,
               isAIThinking: false,
+              moveHistory: updatedHistory,
             });
           } else {
             set({ isAIThinking: false });
@@ -172,8 +207,15 @@ export const useGameStore = create<GameState>((set, get) => ({
           set({ isAIThinking: false });
 
           // 显示错误通知
-          if (gameMode === "llm") {
-            alert(`大模型API请求失败: ${error.message}\n请检查网络连接和API配置`);
+          const { gameMode: currentMode } = get();
+          if (currentMode === "llm") {
+            alert(
+              `大模型API请求失败: ${error.message}\n请检查网络连接和API配置`
+            );
+          } else if (currentMode === "yixin") {
+            alert(
+              `弈心引擎错误: ${error.message}\n请确保服务器运行在 http://localhost:3001`
+            );
           }
         });
     }
@@ -188,6 +230,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       winner: 0,
       gameOver: false,
       isAIThinking: false,
+      moveHistory: [], // 重置落子历史
     });
   },
 
@@ -195,8 +238,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     let newAIPlayer: AIPlayer | null = null;
 
     if (mode === "ai" || mode === "llm") {
-      newAIPlayer = new AIPlayer(createAIConfig("medium", 2)); // 默认中等难度
+      newAIPlayer = new AIPlayer(createAIConfig("medium", 2)); // 默认中等难度，AI是白棋
     }
+    // 弈心模式不需要AIPlayer实例，因为它通过API调用
 
     set({
       gameMode: mode,
@@ -206,7 +250,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       winner: 0,
       gameOver: false,
       isAIThinking: false,
+      moveHistory: [], // 重置落子历史
     });
+
+    // 如果切换到弈心模式，确保引擎已初始化
+    if (mode === "yixin") {
+      yiXinService.testConnection().then((connectionResult) => {
+        if (!connectionResult.success) {
+          console.error("弈心引擎连接失败:", connectionResult.message);
+          alert(
+            `弈心引擎连接失败: ${connectionResult.message}\n请确保服务器运行在 http://localhost:3001`
+          );
+          return;
+        }
+
+        yiXinService.getStatus().then((status) => {
+          if (!status.ready) {
+            console.log("🎯 弈心引擎未就绪，将在首次对局时自动初始化");
+          } else {
+            console.log("✅ 弈心引擎已就绪");
+          }
+        });
+      });
+    }
   },
 
   setLLMConfig: (config: LLMConfig) => {
