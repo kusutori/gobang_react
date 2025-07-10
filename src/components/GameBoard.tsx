@@ -759,15 +759,17 @@ export const GameBoard: React.FC = () => {
   // 检查游戏结果并播放音效
   useEffect(() => {
     if (gameOver) {
-      console.log('游戏结束，获胜者:', winner, '游戏模式:', gameMode);
+      console.log('游戏结束，获胜者:', winner, '游戏模式:', gameMode, 'AI先手:', aiFirst);
       
       if (winner) {
         audioService.playSound('win');
         
         // 更新统计数据
         if (gameMode === 'ai' || gameMode === 'llm' || gameMode === 'yixin' || gameMode === 'advanced') {
-          // AI/LLM/弈心/高级AI模式下，玩家是黑棋(1)
-          if (winner === 1) {
+          // 计算玩家的棋子颜色：AI先手时玩家是白棋(2)，否则是黑棋(1)
+          const playerNumber = aiFirst ? 2 : 1;
+          
+          if (winner === playerNumber) {
             const aiName = gameMode === 'llm' ? '大模型' : 
                           gameMode === 'yixin' ? '弈心' : 
                           gameMode === 'advanced' ? '高级AI' : 'AI';
@@ -791,7 +793,7 @@ export const GameBoard: React.FC = () => {
         updateGameStats('draw');
       }
     }
-  }, [gameOver, winner, gameMode]);
+  }, [gameOver, winner, gameMode, aiFirst]);
 
   // 简化的状态监控，避免无限循环
   const prevStateRef = useRef({ 
