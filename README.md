@@ -175,7 +175,7 @@ gobang_react/
 
 ## 📄 许可证
 
-MIT License
+GPL3 License
 
 ---
 
