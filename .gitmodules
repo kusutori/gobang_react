@@ -1,0 +1,6 @@
+[submodule "gobang"]
+	path = gobang
+	url = https://github.com/kusutori/gobang.git
+[submodule "external/YiXin-Wuziqi-API"]
+	path = external/YiXin-Wuziqi-API
+	url = https://github.com/kusutori/YiXin-Wuziqi-API.git
