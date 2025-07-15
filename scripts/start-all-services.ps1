@@ -35,10 +35,10 @@ function Stop-PortProcess {
             $processes | ForEach-Object {
                 $parts = $_ -split '\s+' | Where-Object { $_ -ne '' }
                 if ($parts.Length -ge 5) {
-                    $pid = $parts[4]
-                    if ($pid -match '^\d+$') {
-                        Write-ColorOutput "🔴 停止占用端口 $Port 的进程 (PID: $pid)" "Yellow"
-                        taskkill /PID $pid /F 2>$null
+                    $processId = $parts[4]
+                    if ($processId -match '^\d+$') {
+                        Write-ColorOutput "🔴 停止占用端口 $Port 的进程 (PID: $processId)" "Yellow"
+                        taskkill /PID $processId /F 2>$null
                     }
                 }
             }
@@ -64,7 +64,8 @@ function Stop-AllServices {
 function Start-PythonService {
     Write-ColorOutput "🐍 启动 Python YiXin HTTP 服务..." "Cyan"
     
-    $pythonDir = "c:\Users\kusut\Desktop\github\gobang_react\YiXin-Wuziqi-API"
+    $pythonDir = Join-Path $PSScriptRoot "..\external\YiXin-Wuziqi-API"
+    $pythonDir = Resolve-Path $pythonDir
     
     if (-not (Test-Path $pythonDir)) {
         Write-ColorOutput "❌ Python 服务目录不存在: $pythonDir" "Red"
@@ -82,6 +83,9 @@ function Start-PythonService {
         $pythonJob = Start-Job -ScriptBlock {
             param($dir)
             Set-Location $dir
+            # 设置环境变量解决 Unicode 编码问题
+            $env:PYTHONIOENCODING = "utf-8"
+            $env:LANG = "en_US.UTF-8"
             uv run python yixin_http_service.py
         } -ArgumentList $pythonDir
         
@@ -115,7 +119,7 @@ function Start-PythonService {
 function Start-NodeBackend {
     Write-ColorOutput "🟢 启动 Node.js 后端服务..." "Cyan"
     
-    $backendDir = "c:\Users\kusut\Desktop\github\gobang_react\server"
+    $backendDir = Join-Path $PSScriptRoot "..\server"
     
     if (-not (Test-Path $backendDir)) {
         Write-ColorOutput "❌ 后端服务目录不存在: $backendDir" "Red"
@@ -166,7 +170,7 @@ function Start-NodeBackend {
 function Start-Frontend {
     Write-ColorOutput "⚛️  启动前端开发服务器..." "Cyan"
     
-    $frontendDir = "c:\Users\kusut\Desktop\github\gobang_react"
+    $frontendDir = Join-Path $PSScriptRoot ".."
     
     if (-not (Test-Path $frontendDir)) {
         Write-ColorOutput "❌ 前端服务目录不存在: $frontendDir" "Red"
@@ -218,7 +222,7 @@ if ($RestartAll) {
 }
 
 Write-ColorOutput "🚀 五子棋应用启动脚本" "Magenta"
-Write-ColorOutput "=" * 50 "Magenta"
+Write-ColorOutput ("=" * 50) "Magenta"
 
 # 启动所有服务
 $pythonJob = Start-PythonService
@@ -247,11 +251,11 @@ if (-not $frontendJob) {
 
 Write-ColorOutput "" "White"
 Write-ColorOutput "🎉 所有服务启动成功！" "Green"
-Write-ColorOutput "=" * 50 "Green"
+Write-ColorOutput ("=" * 50) "Green"
 Write-ColorOutput "🐍 Python YiXin HTTP 服务: http://localhost:5000" "Cyan"
 Write-ColorOutput "🟢 Node.js 后端服务:      http://localhost:3001" "Cyan"
 Write-ColorOutput "⚛️  前端开发服务器:       http://localhost:3000" "Cyan"
-Write-ColorOutput "=" * 50 "Green"
+Write-ColorOutput ("=" * 50) "Green"
 Write-ColorOutput ""
 
 # 初始化 YiXin 引擎
