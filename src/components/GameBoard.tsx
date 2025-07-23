@@ -774,23 +774,23 @@ export const GameBoard: React.FC = () => {
                           gameMode === 'yixin' ? '弈心' : 
                           gameMode === 'advanced' ? '高级AI' : 'AI';
             console.log('玩家击败' + aiName + '，更新胜利统计');
-            updateGameStats('win');
+            updateGameStats('win', gameMode);
           } else {
             const aiName = gameMode === 'llm' ? '大模型' : 
                           gameMode === 'yixin' ? '弈心' : 
                           gameMode === 'advanced' ? '高级AI' : 'AI';
             console.log(aiName + '击败玩家，更新失败统计');
-            updateGameStats('lose');
+            updateGameStats('lose', gameMode);
           }
         } else if (gameMode === 'human') {
           // 双人模式下
           console.log('双人模式游戏结束，获胜者:', winner === 1 ? '黑棋' : '白棋');
-          updateGameStats('win'); // 双人模式只记录游戏次数
+          updateGameStats('win', 'human'); // 双人模式只记录游戏次数
         }
       } else {
         // 平局情况
         console.log('游戏平局');
-        updateGameStats('draw');
+        updateGameStats('draw', gameMode);
       }
     }
   }, [gameOver, winner, gameMode, aiFirst]);

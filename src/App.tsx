@@ -9,10 +9,13 @@ import { AudioControls } from "./components/AudioControls";
 import { GameStatsPanel } from "./components/GameStatsPanel";
 import { QuickGuide } from "./components/QuickGuide";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AuthDialog } from "./components/AuthDialog";
+import { UserProfile } from "./components/UserProfile";
 import { useKeyboardShortcuts, globalShortcuts } from "./hooks/useKeyboardShortcuts";
 import { RoomData, socketService, SOCKET_EVENTS } from "./services/SocketService";
 import { themeService } from "./services/ThemeService";
 import { audioService } from "./services/AudioService";
+import { useAuthStore } from "./store/authStore";
 import "./index.css";
 
 type GameMode = 'menu' | 'local' | 'online' | 'online-playing';
@@ -22,7 +25,12 @@ export function App() {
   const [currentRoom, setCurrentRoom] = useState<RoomData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
+
+  // 认证相关
+  const { initialize, isAuthenticated, user } = useAuthStore();
 
   // 检查是否需要显示快速入门指南
   useEffect(() => {
@@ -31,6 +39,11 @@ export function App() {
       setShowGuide(true);
     }
   }, []);
+
+  // 初始化认证状态
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   // 监听主题变化
   useEffect(() => {
@@ -192,6 +205,25 @@ export function App() {
               <span className="text-sm text-gray-600">{currentTheme.name}</span>
             </div>
             <div className="flex items-center gap-2">
+              {/* 账户相关按钮 */}
+              {isAuthenticated && user ? (
+                <button
+                  onClick={() => setShowUserProfile(true)}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                  title="用户资料"
+                >
+                  <span className="text-lg">👤</span>
+                  <span className="text-sm hidden md:inline">{user.name || user.email.split('@')[0]}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAuthDialog(true)}
+                  className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                  title="登录/注册"
+                >
+                  🔐
+                </button>
+              )}
               <AudioControls />
               <FullscreenButton />
               <button
@@ -261,6 +293,20 @@ export function App() {
         
         {showGuide && (
           <QuickGuide onClose={() => setShowGuide(false)} />
+        )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
         )}
       </div>
     );
@@ -357,6 +403,20 @@ export function App() {
         {showGuide && (
           <QuickGuide onClose={() => setShowGuide(false)} />
         )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
+        )}
       </div>
     );
   }
@@ -400,6 +460,20 @@ export function App() {
         
         {showGuide && (
           <QuickGuide onClose={() => setShowGuide(false)} />
+        )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
         )}
       </div>
     );
@@ -497,6 +571,20 @@ export function App() {
         
         {showGuide && (
           <QuickGuide onClose={() => setShowGuide(false)} />
+        )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
         )}
       </div>
     );

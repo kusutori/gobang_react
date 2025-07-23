@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { themeService } from '../services/ThemeService';
+import { useAuthStore } from '../store/authStore';
 
 interface GameStats {
   totalGames: number;
@@ -22,9 +23,28 @@ export const GameStatsPanel: React.FC = () => {
     bestStreak: 0
   });
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
+  
+  // 从认证store获取用户数据
+  const { isAuthenticated, userStats } = useAuthStore();
 
   useEffect(() => {
-    // 从localStorage加载统计数据
+    // 如果已登录且有用户统计数据，优先使用Appwrite数据
+    if (isAuthenticated && userStats) {
+      const appwriteStats: GameStats = {
+        totalGames: userStats.total_games,
+        wins: userStats.wins,
+        losses: userStats.losses,
+        draws: userStats.draws,
+        winRate: userStats.total_games > 0 ? Math.round((userStats.wins / userStats.total_games) * 100) : 0,
+        currentStreak: userStats.current_streak,
+        bestStreak: userStats.best_streak
+      };
+      setStats(appwriteStats);
+      console.log('使用Appwrite统计数据:', appwriteStats);
+      return;
+    }
+
+    // 如果未登录，从localStorage加载本地统计数据
     const savedStats = localStorage.getItem('gobang_stats');
     if (savedStats) {
       try {
@@ -63,7 +83,7 @@ export const GameStatsPanel: React.FC = () => {
       window.removeEventListener('stats-updated', handleStatsUpdate as EventListener);
       console.log('已移除stats-updated事件监听器');
     };
-  }, []);
+  }, [isAuthenticated, userStats]);
 
   // 监听主题变化
   useEffect(() => {
@@ -138,55 +158,11 @@ export const GameStatsPanel: React.FC = () => {
 };
 
 // 工具函数：更新统计数据
-export const updateGameStats = (result: 'win' | 'lose' | 'draw') => {
-  console.log('更新统计数据，结果:', result);
+export const updateGameStats = (result: 'win' | 'lose' | 'draw', opponentType: string = 'ai') => {
+  console.log('更新统计数据，结果:', result, '对手类型:', opponentType);
   
-  const savedStats = localStorage.getItem('gobang_stats');
-  let stats: GameStats = {
-    totalGames: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    winRate: 0,
-    currentStreak: 0,
-    bestStreak: 0
-  };
-
-  if (savedStats) {
-    try {
-      stats = JSON.parse(savedStats);
-      console.log('读取到现有统计数据:', stats);
-    } catch (error) {
-      console.error('解析已保存的统计数据失败:', error);
-    }
-  } else {
-    console.log('未找到已保存的统计数据，使用默认值');
-  }
-
-  stats.totalGames++;
-  
-  if (result === 'win') {
-    stats.wins++;
-    stats.currentStreak++;
-    stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak);
-  } else if (result === 'lose') {
-    stats.losses++;
-    stats.currentStreak = 0;
-  } else {
-    stats.draws++;
-    stats.currentStreak = 0;
-  }
-
-  stats.winRate = stats.totalGames > 0 ? (stats.wins / stats.totalGames) * 100 : 0;
-
-  console.log('更新后的统计数据:', stats);
-  localStorage.setItem('gobang_stats', JSON.stringify(stats));
-  
-  // 触发自定义事件以更新UI
-  try {
-    window.dispatchEvent(new CustomEvent('stats-updated', { detail: stats }));
-    console.log('成功派发stats-updated事件');
-  } catch (error) {
-    console.error('派发stats-updated事件失败:', error);
-  }
+  // 导入并使用新的统计处理函数
+  import('../utils/gameStats').then(({ handleGameResult }) => {
+    handleGameResult(result, opponentType);
+  });
 };

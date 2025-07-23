@@ -12,6 +12,7 @@
     "proxy": "bun run server/llm-proxy.ts"
   },
   "dependencies": {
+    "appwrite": "^16.0.2",
     "bun-plugin-tailwind": "^0.0.14",
     "gsap": "^3.13.0",
     "pixi.js": "^8.11.0",
