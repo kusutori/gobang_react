@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GameBoard } from "./components/GameBoard";
 import { OnlineGame } from "./components/OnlineGame";
 import { AppwriteOnlineGame } from "./components/AppwriteOnlineGame";
+import { AppwriteOnlineGameBoard } from "./components/AppwriteOnlineGameBoard";
 import { OnlineGameBoard } from "./components/OnlineGameBoard";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ThemeSelector } from "./components/ThemeSelector";
@@ -174,6 +175,7 @@ export function App() {
 
   // Appwrite 在线游戏开始回调
   const handleAppwriteGameStart = (room: OnlineRoom) => {
+    console.log('🚀 App.tsx 收到游戏开始事件:', room);
     setCurrentOnlineRoom(room);
     setGameMode('appwrite-online-playing');
     audioService.playSound('start');
@@ -762,9 +764,15 @@ export function App() {
             </button>
           </div>
 
-          {/* 右侧游戏区域 - 这里需要创建一个新的 AppwriteOnlineGameBoard 组件 */}
+          {/* 右侧游戏区域 - 使用专门的在线游戏棋盘组件 */}
           <div className="flex-1 flex items-center justify-center p-6 game-area">
-            <GameBoard />
+            <AppwriteOnlineGameBoard 
+              room={currentOnlineRoom}
+              onGameEnd={(winner) => {
+                console.log('游戏结束:', winner);
+                // 可以在这里处理游戏结束逻辑
+              }}
+            />
           </div>
         </div>
         

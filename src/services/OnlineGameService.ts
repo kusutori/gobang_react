@@ -84,10 +84,27 @@ class OnlineGameService {
 
     // 将数据库文档转换为房间对象
     private documentToRoom(doc: any): OnlineRoom {
+        console.log('🔍 原始文档数据:', {
+            boardStr: doc.board,
+            boardType: typeof doc.board,
+            playersStr: doc.players,
+            playersType: typeof doc.players
+        });
+
+        const board = this.deserializeBoard(doc.board);
+        const players = this.deserializePlayers(doc.players);
+
+        console.log('🔍 反序列化结果:', {
+            board,
+            boardHasData: board.some(row => row.some(cell => cell !== 0)),
+            players,
+            playersLength: players.length
+        });
+
         return {
             ...doc,
-            board: this.deserializeBoard(doc.board),
-            players: this.deserializePlayers(doc.players)
+            board,
+            players
         };
     }
 
@@ -258,28 +275,51 @@ class OnlineGameService {
 
             if (updatedPlayers.length === 0) {
                 // 如果没有玩家了，删除房间
+                console.log('🗑️ 房间无玩家，删除房间:', this.currentRoom.room_code);
                 await databases.deleteDocument(
                     DATABASE_ID,
                     COLLECTIONS.ONLINE_ROOMS,
                     this.currentRoom.$id!
                 );
             } else {
-                // 更新房间
-                await databases.updateDocument(
-                    DATABASE_ID,
-                    COLLECTIONS.ONLINE_ROOMS,
-                    this.currentRoom.$id!,
-                    {
-                        players: this.serializePlayers(updatedPlayers),
-                        updated_at: new Date().toISOString()
-                    }
-                );
+                // 如果剩下的玩家数量不足且游戏正在进行中，结束游戏
+                if (updatedPlayers.length === 1 && this.currentRoom.status === RoomStatus.PLAYING) {
+                    console.log('🏆 玩家离开，剩余玩家获胜');
+                    const remainingPlayer = updatedPlayers[0];
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        COLLECTIONS.ONLINE_ROOMS,
+                        this.currentRoom.$id!,
+                        {
+                            players: this.serializePlayers(updatedPlayers),
+                            status: RoomStatus.FINISHED,
+                            winner: remainingPlayer.color,
+                            updated_at: new Date().toISOString()
+                        }
+                    );
+                } else {
+                    // 正常更新房间
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        COLLECTIONS.ONLINE_ROOMS,
+                        this.currentRoom.$id!,
+                        {
+                            players: this.serializePlayers(updatedPlayers),
+                            // 如果房间回到等待状态（玩家不足），重置状态
+                            status: updatedPlayers.length < 2 ? RoomStatus.WAITING : this.currentRoom.status,
+                            updated_at: new Date().toISOString()
+                        }
+                    );
+                }
             }
 
             this.currentRoom = null;
             this.emit('room-left', {});
         } catch (error) {
             console.error('离开房间失败:', error);
+            // 即使出错也要清理本地状态
+            this.currentRoom = null;
+            this.emit('room-left', {});
             throw error;
         }
     }
@@ -392,6 +432,14 @@ class OnlineGameService {
                 updateData.winner = winner;
             }
 
+            console.log('🎯 准备更新房间状态:', {
+                roomId: this.currentRoom.$id,
+                updateData,
+                newBoard,
+                winner,
+                newStatus
+            });
+
             await databases.updateDocument(
                 DATABASE_ID,
                 COLLECTIONS.ONLINE_ROOMS,
@@ -399,13 +447,26 @@ class OnlineGameService {
                 updateData
             );
 
+            console.log('✅ 房间状态更新成功');
+
+            // 立即更新本地状态
             this.currentRoom = {
                 ...this.currentRoom,
                 board: newBoard,
                 current_player: newStatus === RoomStatus.FINISHED ? this.currentRoom.current_player : nextPlayer,
                 status: newStatus,
-                winner: winner || this.currentRoom.winner
+                winner: winner || this.currentRoom.winner,
+                updated_at: updateData.updated_at
             };
+
+            console.log('🔄 本地房间状态已更新:', {
+                boardHasData: this.currentRoom.board.some(row => row.some(cell => cell !== 0)),
+                currentPlayer: this.currentRoom.current_player,
+                status: this.currentRoom.status
+            });
+
+            // 立即触发房间更新事件，让UI能立即响应
+            this.emit('room-updated', this.currentRoom);
 
             this.emit('move-made', {
                 room: this.currentRoom,
@@ -498,14 +559,22 @@ class OnlineGameService {
 
     // 订阅房间更新
     subscribeToRoom(roomId: string): (() => void) {
+        console.log('🔔 开始订阅房间:', roomId);
+
         // 使用轮询作为实时更新的替代方案
         const pollInterval = setInterval(async () => {
             if (!this.currentRoom || this.currentRoom.$id !== roomId) {
+                console.log('⏹️ 轮询停止 - 房间不匹配:', {
+                    hasCurrentRoom: !!this.currentRoom,
+                    currentRoomId: this.currentRoom?.$id,
+                    targetRoomId: roomId
+                });
                 clearInterval(pollInterval);
                 return;
             }
 
             try {
+                console.log('🔄 轮询房间数据...', roomId);
                 const response = await databases.getDocument(
                     DATABASE_ID,
                     COLLECTIONS.ONLINE_ROOMS,
@@ -513,9 +582,39 @@ class OnlineGameService {
                 );
 
                 const updatedRoom = this.documentToRoom(response);
-                if (updatedRoom.updated_at !== this.currentRoom.updated_at) {
+                console.log('📊 轮询获取房间状态:', {
+                    roomId,
+                    oldStatus: this.currentRoom.status,
+                    newStatus: updatedRoom.status,
+                    oldUpdatedAt: this.currentRoom.updated_at,
+                    newUpdatedAt: updatedRoom.updated_at,
+                    boardHasData: updatedRoom.board.some(row => row.some(cell => cell !== 0)),
+                    shouldUpdate: new Date(updatedRoom.updated_at) > new Date(this.currentRoom.updated_at)
+                });
+
+                // 只有当服务器数据确实更新时才覆盖本地状态
+                if (new Date(updatedRoom.updated_at) > new Date(this.currentRoom.updated_at)) {
+                    const oldStatus = this.currentRoom.status;
                     this.currentRoom = updatedRoom;
+
+                    console.log('🔄 房间状态更新 (通过轮询):', {
+                        status: updatedRoom.status,
+                        currentPlayer: updatedRoom.current_player,
+                        boardHasData: updatedRoom.board.some(row => row.some(cell => cell !== 0))
+                    });
+
+                    // 触发房间更新事件
                     this.emit('room-updated', updatedRoom);
+
+                    // 检查游戏是否刚开始
+                    if (oldStatus === RoomStatus.WAITING && updatedRoom.status === RoomStatus.PLAYING) {
+                        this.emit('game-started', updatedRoom);
+                    }
+
+                    // 检查游戏是否结束
+                    if (updatedRoom.status === RoomStatus.FINISHED && oldStatus !== RoomStatus.FINISHED) {
+                        this.emit('game-over', { room: updatedRoom, winner: updatedRoom.winner });
+                    }
                 }
             } catch (error) {
                 console.error('轮询房间状态失败:', error);
@@ -523,13 +622,163 @@ class OnlineGameService {
         }, 2000); // 每2秒轮询一次
 
         // 返回清理函数
-        return () => clearInterval(pollInterval);
+        return () => {
+            console.log('🧹 清理轮询:', roomId);
+            clearInterval(pollInterval);
+        };
     }
 
     // 清理资源
     cleanup(): void {
         this.currentRoom = null;
         this.listeners.clear();
+    }
+
+    // 清理过期房间
+    async cleanupExpiredRooms(maxAgeHours: number = 2): Promise<number> {
+        try {
+            const cutoffTime = new Date();
+            cutoffTime.setHours(cutoffTime.getHours() - maxAgeHours);
+            const cutoffISOString = cutoffTime.toISOString();
+
+            console.log('🧹 开始清理过期房间，截止时间:', cutoffISOString);
+
+            // 获取所有可能过期的房间
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTIONS.ONLINE_ROOMS,
+                [
+                    Query.lessThan('updated_at', cutoffISOString),
+                    Query.limit(100)
+                ]
+            );
+
+            console.log(`🔍 找到 ${response.documents.length} 个可能过期的房间`);
+
+            let deletedCount = 0;
+            for (const doc of response.documents) {
+                try {
+                    await databases.deleteDocument(
+                        DATABASE_ID,
+                        COLLECTIONS.ONLINE_ROOMS,
+                        doc.$id
+                    );
+                    deletedCount++;
+                    console.log(`🗑️ 已删除过期房间: ${doc.room_code} (${doc.$id})`);
+                } catch (error) {
+                    console.error(`删除房间 ${doc.room_code} 失败:`, error);
+                }
+            }
+
+            console.log(`✅ 清理完成，共删除 ${deletedCount} 个过期房间`);
+            return deletedCount;
+        } catch (error) {
+            console.error('清理过期房间失败:', error);
+            return 0;
+        }
+    }
+
+    // 清理僵尸房间（状态为游戏中但长时间无更新的房间）
+    async cleanupZombieRooms(maxInactiveMinutes: number = 30): Promise<number> {
+        try {
+            const cutoffTime = new Date();
+            cutoffTime.setMinutes(cutoffTime.getMinutes() - maxInactiveMinutes);
+            const cutoffISOString = cutoffTime.toISOString();
+
+            console.log('🧟 开始清理僵尸房间，截止时间:', cutoffISOString);
+
+            // 获取游戏中但长时间无更新的房间
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTIONS.ONLINE_ROOMS,
+                [
+                    Query.equal('status', RoomStatus.PLAYING),
+                    Query.lessThan('updated_at', cutoffISOString),
+                    Query.limit(50)
+                ]
+            );
+
+            console.log(`🔍 找到 ${response.documents.length} 个僵尸房间`);
+
+            let deletedCount = 0;
+            for (const doc of response.documents) {
+                try {
+                    await databases.deleteDocument(
+                        DATABASE_ID,
+                        COLLECTIONS.ONLINE_ROOMS,
+                        doc.$id
+                    );
+                    deletedCount++;
+                    console.log(`🗑️ 已删除僵尸房间: ${doc.room_code} (${doc.$id})`);
+                } catch (error) {
+                    console.error(`删除僵尸房间 ${doc.room_code} 失败:`, error);
+                }
+            }
+
+            console.log(`✅ 僵尸房间清理完成，共删除 ${deletedCount} 个房间`);
+            return deletedCount;
+        } catch (error) {
+            console.error('清理僵尸房间失败:', error);
+            return 0;
+        }
+    }
+
+    // 强制清理所有房间（危险操作，仅用于开发调试）
+    async forceCleanupAllRooms(): Promise<number> {
+        try {
+            console.log('⚠️ 警告：执行强制清理所有房间');
+
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTIONS.ONLINE_ROOMS,
+                [Query.limit(100)]
+            );
+
+            console.log(`🔍 找到 ${response.documents.length} 个房间需要清理`);
+
+            let deletedCount = 0;
+            for (const doc of response.documents) {
+                try {
+                    await databases.deleteDocument(
+                        DATABASE_ID,
+                        COLLECTIONS.ONLINE_ROOMS,
+                        doc.$id
+                    );
+                    deletedCount++;
+                    console.log(`🗑️ 已删除房间: ${doc.room_code} (${doc.$id})`);
+                } catch (error) {
+                    console.error(`删除房间 ${doc.room_code} 失败:`, error);
+                }
+            }
+
+            console.log(`✅ 强制清理完成，共删除 ${deletedCount} 个房间`);
+            return deletedCount;
+        } catch (error) {
+            console.error('强制清理房间失败:', error);
+            return 0;
+        }
+    }
+
+    // 自动房间维护（定期清理）
+    startAutoMaintenance(intervalMinutes: number = 10): (() => void) {
+        console.log(`🔧 启动自动房间维护，间隔: ${intervalMinutes} 分钟`);
+
+        const maintenanceInterval = setInterval(async () => {
+            console.log('🔧 执行定期房间维护...');
+            try {
+                const zombieCount = await this.cleanupZombieRooms(30);
+                const expiredCount = await this.cleanupExpiredRooms(2);
+                console.log(`🔧 维护完成: 清理僵尸房间 ${zombieCount} 个，过期房间 ${expiredCount} 个`);
+            } catch (error) {
+                console.error('自动维护失败:', error);
+            }
+        }, intervalMinutes * 60 * 1000);
+
+        // 返回停止函数
+        return () => {
+            console.log('🛑 停止自动房间维护');
+            clearInterval(maintenanceInterval);
+        };
     }
 }
 

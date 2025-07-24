@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onlineGameService, OnlineRoom, RoomStatus, OnlinePlayer } from '../services/OnlineGameService';
 import { useAuthStore } from '../store/authStore';
 import { themeService } from '../services/ThemeService';
+import { RoomMaintenancePanel } from './RoomMaintenancePanel';
 
 interface AppwriteOnlineGameProps {
   onBack: () => void;
@@ -11,12 +12,14 @@ interface AppwriteOnlineGameProps {
 export const AppwriteOnlineGame: React.FC<AppwriteOnlineGameProps> = ({ onBack, onGameStart }) => {
   const { user, isAuthenticated } = useAuthStore();
   const [currentRoom, setCurrentRoom] = useState<OnlineRoom | null>(null);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [roomList, setRoomList] = useState<OnlineRoom[]>([]);
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme());
+  const [showMaintenance, setShowMaintenance] = useState(false);
 
   // 监听主题变化
   useEffect(() => {
@@ -42,33 +45,41 @@ export const AppwriteOnlineGame: React.FC<AppwriteOnlineGameProps> = ({ onBack, 
   useEffect(() => {
     const handleRoomCreated = (room: OnlineRoom) => {
       setCurrentRoom(room);
+      setCurrentRoomId(room.$id || null);
       setError('');
     };
 
     const handleRoomJoined = (room: OnlineRoom) => {
       setCurrentRoom(room);
+      setCurrentRoomId(room.$id || null);
       setError('');
     };
 
     const handleRoomLeft = () => {
       setCurrentRoom(null);
+      setCurrentRoomId(null);
       setIsReady(false);
       loadRoomList();
     };
 
     const handlePlayerReadyUpdate = (room: OnlineRoom) => {
       setCurrentRoom(room);
+      // roomId 不变，只更新房间内容
     };
 
     const handleGameStarted = (room: OnlineRoom) => {
+      console.log('🎮 游戏开始事件触发:', room);
       setCurrentRoom(room);
+      // roomId 不变，只更新房间内容
       if (onGameStart) {
         onGameStart(room);
       }
     };
 
     const handleRoomUpdated = (room: OnlineRoom) => {
+      console.log('🔄 房间状态更新:', room.status, room);
       setCurrentRoom(room);
+      // roomId 不变，只更新房间内容
     };
 
     onlineGameService.addEventListener('room-created', handleRoomCreated);
@@ -88,13 +99,17 @@ export const AppwriteOnlineGame: React.FC<AppwriteOnlineGameProps> = ({ onBack, 
     };
   }, [onGameStart]);
 
-  // 订阅房间更新
+  // 订阅房间更新 - 使用独立的 roomId 状态避免因 room 对象更新而重新订阅
   useEffect(() => {
-    if (currentRoom?.$id) {
-      const unsubscribe = onlineGameService.subscribeToRoom(currentRoom.$id);
-      return unsubscribe;
+    if (currentRoomId) {
+      console.log('🔔 创建新的房间轮询:', currentRoomId);
+      const unsubscribe = onlineGameService.subscribeToRoom(currentRoomId);
+      return () => {
+        console.log('🧹 清理房间轮询:', currentRoomId);
+        unsubscribe();
+      };
     }
-  }, [currentRoom?.$id]);
+  }, [currentRoomId]); // 只有当房间ID真正改变时才重新创建轮询
 
   const loadRoomList = async () => {
     try {
@@ -338,13 +353,22 @@ export const AppwriteOnlineGame: React.FC<AppwriteOnlineGameProps> = ({ onBack, 
         <div>
           <div className="flex justify-between items-center mb-3">
             <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass}`}>房间列表</h3>
-            <button
-              onClick={loadRoomList}
-              disabled={isLoading}
-              className="px-3 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300 transition-colors disabled:opacity-50"
-            >
-              刷新
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowMaintenance(true)}
+                className="px-3 py-1 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 transition-colors"
+                title="房间维护"
+              >
+                🔧 维护
+              </button>
+              <button
+                onClick={loadRoomList}
+                disabled={isLoading}
+                className="px-3 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300 transition-colors disabled:opacity-50"
+              >
+                刷新
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -400,6 +424,10 @@ export const AppwriteOnlineGame: React.FC<AppwriteOnlineGameProps> = ({ onBack, 
       >
         返回
       </button>
+      
+      {showMaintenance && (
+        <RoomMaintenancePanel onClose={() => setShowMaintenance(false)} />
+      )}
     </div>
   );
 };
