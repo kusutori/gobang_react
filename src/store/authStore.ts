@@ -34,13 +34,13 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
-  
+
   // 数据管理
   loadUserStats: () => Promise<void>;
   loadGameRecords: () => Promise<void>;
   saveGameResult: (gameRecord: Omit<GameRecord, '$id' | 'player_id' | 'played_at'>) => Promise<void>;
   updateUserStats: (result: 'win' | 'lose' | 'draw') => Promise<void>;
-  
+
   // 初始化
   initialize: () => Promise<void>;
 }
@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await account.get();
       set({ user, isAuthenticated: true });
-      
+
       // 加载用户数据
       await get().loadUserStats();
       await get().loadGameRecords();
@@ -75,7 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await account.createEmailPasswordSession(email, password);
       const user = await account.get();
       set({ user, isAuthenticated: true });
-      
+
       // 加载用户数据
       await get().loadUserStats();
       await get().loadGameRecords();
@@ -92,11 +92,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 创建账户
       const user = await account.create(ID.unique(), email, password, name);
-      
+
       // 自动登录
       await account.createEmailPasswordSession(email, password);
       const sessionUser = await account.get();
-      
+
       // 创建初始用户统计
       const initialStats: Omit<UserStats, '$id'> = {
         user_id: sessionUser.$id,
@@ -107,16 +107,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         current_streak: 0,
         best_streak: 0,
       };
-      
+
       await databases.createDocument(
         DATABASE_ID,
         COLLECTIONS.USER_STATS,
         ID.unique(),
         initialStats
       );
-      
+
       set({ user: sessionUser, isAuthenticated: true });
-      
+
       // 加载用户数据
       await get().loadUserStats();
       await get().loadGameRecords();
@@ -145,14 +145,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadUserStats: async () => {
     const { user } = get();
     if (!user) return;
-    
+
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.USER_STATS,
         [`equal("user_id", "${user.$id}")`]
       );
-      
+
       if (response.documents.length > 0) {
         set({ userStats: response.documents[0] as unknown as UserStats });
       }
@@ -164,7 +164,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadGameRecords: async () => {
     const { user } = get();
     if (!user) return;
-    
+
     try {
       const response = await databases.listDocuments(
         DATABASE_ID,
@@ -175,7 +175,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           `limit(50)`
         ]
       );
-      
+
       set({ gameRecords: response.documents as unknown as GameRecord[] });
     } catch (error) {
       console.error('加载游戏记录失败:', error);
@@ -185,24 +185,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   saveGameResult: async (gameRecord: Omit<GameRecord, '$id' | 'player_id' | 'played_at'>) => {
     const { user } = get();
     if (!user) return;
-    
+
     try {
       const record: Omit<GameRecord, '$id'> = {
         ...gameRecord,
         player_id: user.$id,
         played_at: new Date().toISOString(),
       };
-      
+
       await databases.createDocument(
         DATABASE_ID,
         COLLECTIONS.GAME_RECORDS,
         ID.unique(),
         record
       );
-      
+
       // 更新用户统计
       await get().updateUserStats(gameRecord.result);
-      
+
       // 重新加载记录
       await get().loadGameRecords();
     } catch (error) {
@@ -213,11 +213,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateUserStats: async (result: 'win' | 'lose' | 'draw') => {
     const { user, userStats } = get();
     if (!user || !userStats) return;
-    
+
     try {
       const newStats = { ...userStats };
       newStats.total_games += 1;
-      
+
       if (result === 'win') {
         newStats.wins += 1;
         newStats.current_streak += 1;
@@ -229,7 +229,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         newStats.draws += 1;
         newStats.current_streak = 0;
       }
-      
+
       await databases.updateDocument(
         DATABASE_ID,
         COLLECTIONS.USER_STATS,
@@ -243,7 +243,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           best_streak: newStats.best_streak,
         }
       );
-      
+
       set({ userStats: newStats });
     } catch (error) {
       console.error('更新用户统计失败:', error);

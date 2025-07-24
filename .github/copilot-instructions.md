@@ -123,11 +123,11 @@ User management follows a hybrid approach:
 ```typescript
 // Authenticated users: data stored in Appwrite
 if (isAuthenticated) {
-  await authStore.saveGameResult(gameRecord);  // Auto-syncs to cloud
+  await authStore.saveGameResult(gameRecord); // Auto-syncs to cloud
 }
 // Anonymous users: data stored locally
 else {
-  updateLocalStats(result);  // localStorage backup
+  updateLocalStats(result); // localStorage backup
 }
 ```
 
@@ -146,8 +146,8 @@ interface UserStats {
 
 interface GameRecord {
   player_id: string;
-  opponent_type: string;  // 'ai', 'llm', 'yixin', 'human', 'advanced'
-  result: 'win' | 'lose' | 'draw';
+  opponent_type: string; // 'ai', 'llm', 'yixin', 'human', 'advanced'
+  result: "win" | "lose" | "draw";
   game_duration?: number;
   moves_count?: number;
   played_at: string;

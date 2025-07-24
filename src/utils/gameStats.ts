@@ -8,7 +8,7 @@ export const handleGameResult = async (
   movesCount?: number
 ) => {
   const { isAuthenticated, saveGameResult } = useAuthStore.getState();
-  
+
   // 如果用户已登录，保存到Appwrite
   if (isAuthenticated) {
     const gameRecord = {
@@ -17,7 +17,7 @@ export const handleGameResult = async (
       game_duration: gameStartTime ? Math.round((Date.now() - gameStartTime) / 1000) : undefined,
       moves_count: movesCount,
     };
-    
+
     try {
       await saveGameResult(gameRecord);
       console.log('游戏记录已保存到Appwrite:', gameRecord);
@@ -55,7 +55,7 @@ export const updateLocalStats = (result: 'win' | 'lose' | 'draw') => {
   }
 
   stats.totalGames++;
-  
+
   if (result === 'win') {
     stats.wins++;
     stats.currentStreak++;
@@ -75,9 +75,9 @@ export const updateLocalStats = (result: 'win' | 'lose' | 'draw') => {
 
   // 保存到localStorage
   localStorage.setItem('gobang_stats', JSON.stringify(stats));
-  
+
   // 发出事件通知其他组件更新
   window.dispatchEvent(new CustomEvent('stats-updated', { detail: stats }));
-  
+
   console.log('本地统计数据已更新:', stats);
 };
