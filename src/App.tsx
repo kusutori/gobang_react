@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameBoard } from "./components/GameBoard";
 import { OnlineGame } from "./components/OnlineGame";
+import { AppwriteOnlineGame } from "./components/AppwriteOnlineGame";
 import { OnlineGameBoard } from "./components/OnlineGameBoard";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ThemeSelector } from "./components/ThemeSelector";
@@ -13,16 +14,18 @@ import { AuthDialog } from "./components/AuthDialog";
 import { UserProfile } from "./components/UserProfile";
 import { useKeyboardShortcuts, globalShortcuts } from "./hooks/useKeyboardShortcuts";
 import { RoomData, socketService, SOCKET_EVENTS } from "./services/SocketService";
+import { OnlineRoom } from "./services/OnlineGameService";
 import { themeService } from "./services/ThemeService";
 import { audioService } from "./services/AudioService";
 import { useAuthStore } from "./store/authStore";
 import "./index.css";
 
-type GameMode = 'menu' | 'local' | 'online' | 'online-playing';
+type GameMode = 'menu' | 'local' | 'online' | 'online-playing' | 'appwrite-online' | 'appwrite-online-playing';
 
 export function App() {
   const [gameMode, setGameMode] = useState<GameMode>('menu');
   const [currentRoom, setCurrentRoom] = useState<RoomData | null>(null);
+  const [currentOnlineRoom, setCurrentOnlineRoom] = useState<OnlineRoom | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -151,6 +154,7 @@ export function App() {
   const handleBackToMenu = () => {
     setGameMode('menu');
     setCurrentRoom(null);
+    setCurrentOnlineRoom(null);
     socketService.disconnect();
     audioService.playSound('click');
   };
@@ -160,6 +164,19 @@ export function App() {
     socketService.leaveRoom();
     setCurrentRoom(null);
     audioService.playSound('click');
+  };
+
+  const handleBackToAppwriteOnline = () => {
+    setGameMode('appwrite-online');
+    setCurrentOnlineRoom(null);
+    audioService.playSound('click');
+  };
+
+  // Appwrite 在线游戏开始回调
+  const handleAppwriteGameStart = (room: OnlineRoom) => {
+    setCurrentOnlineRoom(room);
+    setGameMode('appwrite-online-playing');
+    audioService.playSound('start');
   };
 
   const handleSettingsClick = () => {
@@ -254,7 +271,7 @@ export function App() {
           
           <div className="flex flex-col items-center gap-6">
             <div className={`${currentTheme.uiBackgroundClass} rounded-2xl shadow-xl p-8 border-2`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <button
                   onClick={() => {
                     setGameMode('local');
@@ -278,9 +295,23 @@ export function App() {
                            font-semibold rounded-xl shadow-lg hover:from-blue-600 hover:to-cyan-600 
                            transform hover:scale-105 transition-all duration-200 active:scale-95"
                 >
-                  <div className="text-2xl mb-2">🌐</div>
-                  <div className="text-lg">联机对战</div>
+                  <div className="text-2xl mb-2">�</div>
+                  <div className="text-lg">本地联机</div>
                   <div className="text-sm opacity-90">局域网多人游戏</div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setGameMode('appwrite-online');
+                    audioService.playSound('click');
+                  }}
+                  className="group p-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white 
+                           font-semibold rounded-xl shadow-lg hover:from-green-600 hover:to-emerald-600 
+                           transform hover:scale-105 transition-all duration-200 active:scale-95"
+                >
+                  <div className="text-2xl mb-2">🌐</div>
+                  <div className="text-lg">在线联机</div>
+                  <div className="text-sm opacity-90">云端多人游戏</div>
                 </button>
               </div>
             </div>
@@ -562,6 +593,178 @@ export function App() {
           {/* 右侧游戏区域 */}
           <div className="flex-1 flex items-center justify-center p-6 game-area">
             <OnlineGameBoard room={currentRoom} />
+          </div>
+        </div>
+        
+        {showSettings && (
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        )}
+        
+        {showGuide && (
+          <QuickGuide onClose={() => setShowGuide(false)} />
+        )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Appwrite 在线游戏模式
+  if (gameMode === 'appwrite-online') {
+    return (
+      <div className={`min-h-screen ${currentTheme.boardBackgroundClass}`}>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-between items-center mb-8">
+            <div className="text-center">
+              <h1 className={`text-5xl font-bold ${currentTheme.headingColorClass} mb-2 drop-shadow-lg`}>
+                五子棋
+              </h1>
+              <p className={`${currentTheme.accentColorClass} text-lg font-medium`}>
+                连续五子获胜 · 在线联机
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <AudioControls />
+              <FullscreenButton />
+              <button
+                onClick={handleSettingsClick}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                ⚙️
+              </button>
+            </div>
+          </div>
+        
+          <AppwriteOnlineGame 
+            onBack={handleBackToMenu}
+            onGameStart={handleAppwriteGameStart}
+          />
+        </div>
+        
+        {showSettings && (
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        )}
+        
+        {showGuide && (
+          <QuickGuide onClose={() => setShowGuide(false)} />
+        )}
+
+        {showAuthDialog && (
+          <AuthDialog 
+            isOpen={showAuthDialog} 
+            onClose={() => setShowAuthDialog(false)} 
+          />
+        )}
+
+        {showUserProfile && (
+          <UserProfile 
+            isOpen={showUserProfile} 
+            onClose={() => setShowUserProfile(false)} 
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Appwrite 在线游戏进行中
+  if (gameMode === 'appwrite-online-playing' && currentOnlineRoom) {
+    return (
+      <div className={`min-h-screen ${currentTheme.boardBackgroundClass}`}>
+        <div className="h-screen flex landscape-layout">
+          {/* 左侧控制面板 */}
+          <div className="w-80 p-6 flex flex-col sidebar">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-amber-800">五子棋</h1>
+                <p className="text-amber-700 text-sm">在线联机 · 房间 {currentOnlineRoom.room_code}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <AudioControls />
+                <FullscreenButton />
+                <button
+                  onClick={handleGuideClick}
+                  className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                  title="快速入门"
+                >
+                  📖
+                </button>
+                <button
+                  onClick={handleSettingsClick}
+                  className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                >
+                  ⚙️
+                </button>
+              </div>
+            </div>
+
+            {/* 房间信息 */}
+            <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 mb-6 border-2`}>
+              <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>🌐 房间信息</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className={`${currentTheme.subTextColorClass}`}>房间代码</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>{currentOnlineRoom.room_code}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={`${currentTheme.subTextColorClass}`}>玩家数</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>{currentOnlineRoom.players.length}/2</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={`${currentTheme.subTextColorClass}`}>游戏状态</span>
+                  <span className={`font-medium ${currentTheme.textColorClass}`}>
+                    {currentOnlineRoom.status === 'finished' ? '已结束' : 
+                     currentOnlineRoom.status === 'playing' ? '游戏中' : '等待中'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 玩家列表 */}
+            <div className={`${currentTheme.uiBackgroundClass} rounded-xl p-4 mb-6 border-2`}>
+              <h3 className={`text-lg font-semibold ${currentTheme.headingColorClass} mb-3`}>👥 玩家列表</h3>
+              <div className="space-y-2">
+                {currentOnlineRoom.players.map((player) => (
+                  <div key={player.user_id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full ${player.color === 1 ? 'bg-black' : 'bg-white border'}`}></div>
+                      <span className={`${currentTheme.textColorClass}`}>{player.username}</span>
+                      {player.user_id === user?.$id && (
+                        <span className="text-xs bg-amber-200 px-1 rounded">您</span>
+                      )}
+                    </div>
+                    <span className={`text-sm ${player.ready ? 'text-green-600' : currentTheme.subTextColorClass}`}>
+                      {player.ready ? '准备' : '未准备'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1"></div>
+
+            <button
+              onClick={handleBackToAppwriteOnline}
+              className="w-full py-3 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              返回大厅
+            </button>
+          </div>
+
+          {/* 右侧游戏区域 - 这里需要创建一个新的 AppwriteOnlineGameBoard 组件 */}
+          <div className="flex-1 flex items-center justify-center p-6 game-area">
+            <GameBoard />
           </div>
         </div>
         

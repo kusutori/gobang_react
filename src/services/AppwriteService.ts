@@ -11,6 +11,8 @@ export const DATABASE_ID = 'gobang_game_db';
 export const COLLECTIONS = {
   GAME_RECORDS: 'game_records',
   USER_STATS: 'user_stats',
+  ONLINE_ROOMS: 'online_rooms',
+  GAME_MOVES: 'game_moves',
 };
 
 export { ID, Query };
