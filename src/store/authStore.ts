@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { account, databases, DATABASE_ID, COLLECTIONS, ID } from '../services/AppwriteService';
+import { account, databases, DATABASE_ID, COLLECTIONS, ID, Query } from '../services/AppwriteService';
 import { Models } from 'appwrite';
 
 export interface UserStats {
@@ -150,7 +150,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.USER_STATS,
-        [`equal("user_id", "${user.$id}")`]
+        [Query.equal("user_id", user.$id)]
       );
 
       if (response.documents.length > 0) {
@@ -170,9 +170,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         DATABASE_ID,
         COLLECTIONS.GAME_RECORDS,
         [
-          `equal("player_id", "${user.$id}")`,
-          `orderDesc("played_at")`,
-          `limit(50)`
+          Query.equal("player_id", user.$id),
+          Query.orderDesc("played_at"),
+          Query.limit(50)
         ]
       );
 

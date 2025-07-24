@@ -1,4 +1,4 @@
-import { Client, Account, Databases, ID } from 'appwrite';
+import { Client, Account, Databases, ID, Query } from 'appwrite';
 
 const client = new Client()
   .setEndpoint('https://syd.cloud.appwrite.io/v1')
@@ -13,5 +13,5 @@ export const COLLECTIONS = {
   USER_STATS: 'user_stats',
 };
 
-export { ID };
+export { ID, Query };
 export default client;
